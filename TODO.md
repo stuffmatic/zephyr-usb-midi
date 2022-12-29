@@ -1,0 +1,1 @@
+* reply to https://github.com/btrepp/usbd-midi/issues/4 re spec compliance

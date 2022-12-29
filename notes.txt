@@ -1,0 +1,116 @@
+Appendix B
+
+MIDI Adapter Device Descriptor
+* 0 bLength 1 0x12 Size of this descriptor, in bytes.
+* 1 bDescriptorType 1 0x01 DEVICE descriptor.
+* 2 bcdUSB 2 0x0110 1.10 - current revision of USB specification.
+* 4 bDeviceClass 1 0x00 Device defined at Interface level.
+* 5 bDeviceSubClass 1 0x00 Unused.
+* 6 bDeviceProtocol 1 0x00 Unused.
+* 7 bMaxPacketSize0 1 0x08 8 bytes.
+* 8 idVendor 2 0xXXXX Vendor ID.
+* 10 idProduct 2 0xXXXX Product ID.
+* 12 bcdDevice 2 0xXXXX Device Release Code.
+* 14 iManufacturer 1 0x01 Index to string descriptor that contains the string <Your Name> in Unicode.
+* 15 iProduct 1 0x02 Index to string descriptor that contains the string <Your Product Name> in Unicode.
+* 16 iSerialNumber 1 0x00 Unused.
+* 17 bNumConfigurations 1 0x01 One configuration.
+
+    MIDI Adapter Configuration Descriptor
+    * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+    * 1 bDescriptorType 1 0x02 CONFIGURATION descriptor.
+    * 2 wTotalLength 2 0x00XX Length of the total configuration block, including this descriptor, in bytes.
+    * 4 bNumInterfaces 1 0x02 Two interfaces.
+    * 5 bConfigurationValue 1 0x01 ID of this configuration.
+    * 6 iConfiguration 1 0x00 Unused.
+    * 7 bmAttributes 1 0x80 Bus Powered device, not Self Powered, no Remote wakeup capability.
+    * 8 MaxPower 1 0x32 100 mA Max. power consumption.
+
+    	MIDI Adapter Standard Audio Control Interface Descriptor
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x04 INTERFACE descriptor.
+        * 2 bInterfaceNumber 1 0x00 Index of this interface.
+        * 3 bAlternateSetting 1 0x00 Index of this setting.
+        * 4 bNumEndpoints 1 0x00 0 endpoints.
+        * 5 bInterfaceClass 1 0x01 AUDIO.
+        * 6 bInterfaceSubclass 1 0x01 AUDIO_CONTROL.
+        * 7 bInterfaceProtocol 1 0x00 Unused.
+        * 8 iInterface 1 0x00 Unused.
+    	MIDI Adapter Class-specific Audio Control Interface Descriptor
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x24 CS_INTERFACE.
+        * 2 bDescriptorSubtype 1 0x01 HEADER subtype.
+        * 3 bcdADC 2 0x0100 Revision of class specification - 1.0
+        * 5 wTotalLength 2 0x0009 Total size of class specific descriptors.
+        * 7 bInCollection 1 0x01 Number of streaming interfaces.
+        * 8 baInterfaceNr(1) 1 0x01 MIDIStreaming interface 1 belongs to this AudioControl interface.
+
+    	MIDI Adapter Standard MS Interface Descriptor
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x04 INTERFACE descriptor.
+        * 2 bInterfaceNumber 1 0x01 Index of this interface.
+        * 3 bAlternateSetting 1 0x00 Index of this alternate setting.
+        * 4 bNumEndpoints 1 0x02 2 endpoints.
+        * 5 bInterfaceClass 1 0x01 AUDIO.
+        * 6 bInterfaceSubclass 1 0x03 MIDISTREAMING.
+        * 7 bInterfaceProtocol 1 0x00 Unused.
+        * 8 iInterface 1 0x00 Unused.
+    	MIDI Adapter Class-specific MS Interface Descriptor
+        * 0 bLength 1 0x07 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x24 CS_INTERFACE descriptor.
+        * 2 bDescriptorSubtype 1 0x01 MS_HEADER subtype.
+        * 3 BcdADC 2 0x0100 Revision of this class specification.
+        * 5 wTotalLength 2 0x0041 Total size of class-specific descriptors .
+
+     	MIDI Adapter MIDI IN Jack Descriptor (Embedded)
+        * 0 bLength 1 0x06 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x24 CS_INTERFACE descriptor.
+        * 2 bDescriptorSubtype 1 0x02 MIDI_IN_JACK subtype.
+        * 3 bJackType 1 0x01 EMBEDDED.
+        * 4 bJackID 1 0x01 ID of this Jack.
+        * 5 iJack 1 0x00 Unused
+
+     	MIDI Adapter MIDI OUT Jack Descriptor (Embedded)
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x24 CS_INTERFACE descriptor.
+        * 2 bDescriptorSubtype 1 0x03 MIDI_OUT_JACK subtype.
+        * 3 bJackType 1 0x01 EMBEDDED.
+        * 4 bJackID 1 0x03 ID of this Jack.
+        * 5 bNrInputPins 1 0x01 Number of Input Pins of this Jack.
+        * 6 BaSourceID(1) 1 0x02 ID of the Entity to which this Pin is connected.
+        * 7 BaSourcePin(1) 1 0x01 Output Pin number of the Entity to which this Input Pin is connected.
+        * 8 iJack 1 0x00 Unused.
+
+     	MIDI Adapter Standard Bulk OUT Endpoint Descriptor
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x05 ENDPOINT descriptor.
+        * 2 bEndpointAddress 1 0x01 OUT Endpoint 1.
+        * 3 bmAttributes 1 0x02 Bulk, not shared.
+        * 4 wMaxPacketSize 2 0x0040 64 bytes per packet.
+        * 6 bInterval 1 0x00 Ignored for Bulk. Set to zero.
+        * 7 bRefresh 1 0x00 Unused.
+        * 8 bSynchAddress 1 0x00 Unused
+
+     	MIDI Adapter Class-specific Bulk OUT Endpoint Descriptor
+        * 0 bLength 1 0x05 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x25 CS_ENDPOINT descriptor
+        * 2 bDescriptorSubtype 1 0x01 MS_GENERAL subtype.
+        * 3 bNumEmbMIDIJack 1 0x01 Number of embedded MIDI IN Jacks.
+        * 4 BaAssocJackID(1) 1 0x01 ID of the Embedded MIDI IN Jack.
+
+     	MIDI Adapter Standard Bulk IN Endpoint Descriptor
+        * 0 bLength 1 0x09 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x05 ENDPOINT descriptor.
+        * 2 bEndpointAddress 1 0x81 IN Endpoint 1.
+        * 3 bmAttributes 1 0x02 Bulk, not shared.
+        * 4 wMaxPacketSize 2 0x0040 64 bytes per packet.
+        * 6 bInterval 1 0x00 Ignored for Bulk. Set to zero.
+        * 7 bRefresh 1 0x00 Unused.
+        * 8 bSynchAddress 1 0x00 Unused.
+
+     	MIDI Adapter Class-specific Bulk IN Endpoint Descriptor
+        * 0 bLength 1 0x05 Size of this descriptor, in bytes.
+        * 1 bDescriptorType 1 0x25 CS_ENDPOINT descriptor
+        * 2 bDescriptorSubtype 1 0x01 MS_GENERAL subtype.
+        * 3 bNumEmbMIDIJack 1 0x01 Number of embedded MIDI OUT Jacks.
+        * 4 BaAssocJackID(1) 1 0x03 ID of the Embedded MIDI OUT Jack.
