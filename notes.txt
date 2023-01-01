@@ -1,6 +1,21 @@
 Appendix B
 
 MIDI Adapter Device Descriptor
+   MIDI Adapter Configuration Descriptor
+      MIDI Adapter Standard Audio Control Interface Descriptor
+      MIDI Adapter Class-specific Audio Control Interface Descriptor
+      MIDI Adapter Standard MS Interface Descriptor
+      MIDI Adapter Class-specific MS Interface Descriptor
+      MIDI Adapter MIDI IN Jack Descriptor (Embedded)
+      MIDI Adapter MIDI OUT Jack Descriptor (Embedded)
+      MIDI Adapter Standard Bulk OUT Endpoint Descriptor
+      MIDI Adapter Class-specific Bulk OUT Endpoint Descriptor
+     	MIDI Adapter Standard Bulk IN Endpoint Descriptor
+      MIDI Adapter Class-specific Bulk IN Endpoint Descriptor
+
+Appendix B
+
+MIDI Adapter Device Descriptor
 * 0 bLength 1 0x12 Size of this descriptor, in bytes.
 * 1 bDescriptorType 1 0x01 DEVICE descriptor.
 * 2 bcdUSB 2 0x0110 1.10 - current revision of USB specification.
@@ -36,6 +51,7 @@ MIDI Adapter Device Descriptor
         * 6 bInterfaceSubclass 1 0x01 AUDIO_CONTROL.
         * 7 bInterfaceProtocol 1 0x00 Unused.
         * 8 iInterface 1 0x00 Unused.
+
     	MIDI Adapter Class-specific Audio Control Interface Descriptor
         * 0 bLength 1 0x09 Size of this descriptor, in bytes.
         * 1 bDescriptorType 1 0x24 CS_INTERFACE.
@@ -55,6 +71,7 @@ MIDI Adapter Device Descriptor
         * 6 bInterfaceSubclass 1 0x03 MIDISTREAMING.
         * 7 bInterfaceProtocol 1 0x00 Unused.
         * 8 iInterface 1 0x00 Unused.
+
     	MIDI Adapter Class-specific MS Interface Descriptor
         * 0 bLength 1 0x07 Size of this descriptor, in bytes.
         * 1 bDescriptorType 1 0x24 CS_INTERFACE descriptor.
