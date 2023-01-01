@@ -130,7 +130,7 @@ struct usb_midi_bulk_in_ep_descriptor {
         .bDeviceClass = 0x00, \
 	    .bDeviceSubClass = 0x00, \
 	    .bDeviceProtocol = 0x00, \
-	    .bMaxPacketSize0 = 0x08, \
+	    .bMaxPacketSize0 = 64, /* 0x08 */ \
 	    .idVendor = 0x2FE3, /* TODO: set properly */ \
 	    .idProduct = 0x1, /* TODO: set properly */ \
 	    .bcdDevice = 0x0, /* TODO: set properly */ \
@@ -479,12 +479,12 @@ NULL)) {
 
 static struct usb_ep_cfg_data midi_ep_cfg[] = {
 	{
-		.ep_cb = midi_out_cb,
-		.ep_addr = LOOPBACK_OUT_EP_ADDR,
-	},
-	{
 		.ep_cb = midi_in_cb,
 		.ep_addr = LOOPBACK_IN_EP_ADDR,
+	},
+    {
+		.ep_cb = midi_out_cb,
+		.ep_addr = LOOPBACK_OUT_EP_ADDR,
 	},
 };
 
@@ -498,7 +498,7 @@ static void midi_interface_config(struct usb_desc_header *head,
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {
 	.usb_device_description = &usb_midi_device_descr,
-	.interface_config = loopback_interface_config,
+	.interface_config = NULL,
 	.interface_descriptor = &usb_midi_device_descr.ac_if,
 	.cb_usb_status = usb_status_callback,
 	.interface = {
