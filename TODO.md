@@ -1,8 +1,10 @@
-* reply to https://github.com/btrepp/usbd-midi/issues/4 re spec compliance
 * n input jacks, n output jacks
 * zephyr unit tests
+* what device descr fields (etc) gets overridden by zephyr?
+* availabe/unavailable cb
+* logging
 
-References
+Other implementations
 
 * https://github.com/BlokasLabs/USBMIDI/
 *
