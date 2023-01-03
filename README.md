@@ -1,6 +1,6 @@
 # zephyr-usb-midi
 
-This repo contains a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI device class](https://www.usb.org/sites/default/files/midi10.pdf) along with a small test app. As the name suggests, this lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB following a widely supported standard.
+This repo contains a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI device class](https://www.usb.org/sites/default/files/midi10.pdf) along with a [small test app](src/main.c). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB following a widely supported standard.
 
 __The code is still work in progress__, but the goal is to get it in good enough shape to submit a PR to mainline Zephyr. Any help to achieve this goal would be greatly appreciated, for example
 
@@ -8,6 +8,7 @@ __The code is still work in progress__, but the goal is to get it in good enough
 * testing compatibility with different host operating systems
 * finding, [reporting](https://github.com/stuffmatic/zephyr-usb-midi/issues) and fixing bugs
 * suggesting or implementing improvements
+* testing with sysex data
 
 ## What works and what doesn't (yet)
 
@@ -23,8 +24,8 @@ See the public API defined in [usb_midi.h](src/usb_midi.h).
 
 ## Configuration options
 
-* `CONFIG_USB_MIDI_NUM_INPUTS` - The number of input ports. Between 0 and 16 (inclusive). Defaults to 1.
-* `CONFIG_USB_MIDI_NUM_OUTPUTS` - The number of output ports. Between 0 and 16 (inclusive). Defaults to 1.
+* `CONFIG_USB_MIDI_NUM_INPUTS` - The number of ports through which MIDI data flows into the device. Between 0 and 16 (inclusive). Defaults to 1.
+* `CONFIG_USB_MIDI_NUM_OUTPUTS` - The number of ports through which MIDI data flows out of the device. Between 0 and 16 (inclusive). Defaults to 1.
 
 ## Development
 
