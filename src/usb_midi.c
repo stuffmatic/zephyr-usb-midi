@@ -50,25 +50,25 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 	}
 
 #define JACK_ID(x, first_id) (x + first_id)
-#define INIT_OUT_EP(num_embedded_in_jacks, embedded_in_jack_id)                           \
+#define INIT_OUT_EP(num_embedded_jacks, embedded_in_jack_id)                           \
 	{                                                                                 \
 		.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor),                \
 		.bDescriptorType = USB_DESC_CS_ENDPOINT,                                  \
 		.bDescriptorSubtype = 0x01,                                               \
-		.bNumEmbMIDIJack = num_embedded_in_jacks,                                 \
+		.bNumEmbMIDIJack = num_embedded_jacks,                                 \
 		.BaAssocJackID = {                                                        \
-			LISTIFY(USB_MIDI_NUM_INPUTS, JACK_ID, (, ), embedded_in_jack_id) \
+			LISTIFY(num_embedded_jacks, JACK_ID, (, ), embedded_in_jack_id) \
 		}                                                                         \
 	}
 
-#define INIT_IN_EP(num_embedded_out_jacks, embedded_out_jack_id)                          \
+#define INIT_IN_EP(num_embedded_jacks, embedded_out_jack_id)                          \
 	{                                                                                 \
 		.bLength = sizeof(struct usb_midi_bulk_in_ep_descriptor),                 \
 		.bDescriptorType = USB_DESC_CS_ENDPOINT,                                  \
 		.bDescriptorSubtype = 0x01,                                               \
-		.bNumEmbMIDIJack = num_embedded_out_jacks,                                \
+		.bNumEmbMIDIJack = num_embedded_jacks,                                \
 		.BaAssocJackID = {                                                        \
-			LISTIFY(USB_MIDI_NUM_OUTPUTS, JACK_ID, (, ), embedded_out_jack_id) \
+			LISTIFY(num_embedded_jacks, JACK_ID, (, ), embedded_out_jack_id) \
 		}                                                                         \
 	}
 
