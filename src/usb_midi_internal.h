@@ -136,7 +136,7 @@ struct usb_midi_bulk_out_ep_descriptor
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
 	uint8_t bNumEmbMIDIJack;
-	uint8_t BaAssocJackID[USB_MIDI_NUM_OUTPUTS];
+	uint8_t BaAssocJackID[USB_MIDI_NUM_INPUTS];
 } __packed;
 
 // Class-Specific MS Bulk Data Endpoint Descriptor corresponding to a MIDI input.
@@ -147,7 +147,7 @@ struct usb_midi_bulk_in_ep_descriptor
 	uint8_t bDescriptorType;
 	uint8_t bDescriptorSubtype;
 	uint8_t bNumEmbMIDIJack;
-	uint8_t BaAssocJackID[USB_MIDI_NUM_INPUTS];
+	uint8_t BaAssocJackID[USB_MIDI_NUM_OUTPUTS];
 } __packed;
 
 // A complete set of descriptors for a USB MIDI device.
