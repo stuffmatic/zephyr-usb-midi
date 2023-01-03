@@ -32,4 +32,4 @@ Development work so far has been done on macOS using [nRF Connect SDK](https://w
 
 [MIDI Monitor](https://www.snoize.com/midimonitor/) and [MidiKeys](https://flit.github.io/projects/midikeys/) are open source macOS apps that have been useful during development.
 
-On macOS, the MIDI Studio window of the built in Audio MIDI Setup app is useful for checking that the device is properly enumrated. ⚠️ __Warning:__ MIDI Studio seems to cache device info between connections, which means changes to for example device name and port configuration won't show up unless you disconnect the device, remove the dimmed device box and reconnect the device.
+On macOS, the MIDI Studio window of the built in Audio MIDI Setup app is useful for inspecting a connected device and making sure it is properly enumrated. ⚠️ __Warning:__ MIDI Studio seems to cache device info between connections, which means changes to for example device name and port configuration won't show up unless you disconnect the device, remove the dimmed device box and reconnect the device.
