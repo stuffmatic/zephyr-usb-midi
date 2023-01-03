@@ -182,10 +182,22 @@ static struct usb_midi_handlers handlers = {
 	.rx_cb = NULL
 };
 
+static void log_packet(struct usb_midi_packet* packet) {
+		printk("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes\n",
+		packet->bytes[0], packet->bytes[1], packet->bytes[2], packet->bytes[3],
+		packet->cable_num, packet->cin, packet->num_midi_bytes
+		);
+}
+
 static void packet_from_midi_bytes(uint8_t* midi_bytes, uint8_t num_midi_bytes, uint8_t cable_num, struct usb_midi_packet *packet) {
-	// Compute CIN
-	enum usb_midi_cin cin = 0;
+	packet->cable_num = cable_num;
+	packet->num_midi_bytes = num_midi_bytes;
+
 	uint8_t first_byte = midi_bytes[0];
+
+	// TODO: actually compute CIN
+	enum usb_midi_cin cin = (first_byte & 0xf0) >> 4;
+	packet->cin = cin;
 
 	// Put cable number and CIN in packet byte 0
 	packet->bytes[0] = (cable_num << 4) | cin;
@@ -248,7 +260,8 @@ uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byt
 {
 	struct usb_midi_packet packet;
 	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
-
+	printk("tx ");
+	log_packet(&packet);
 	uint32_t num_written_bytes = 0;
 	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
 	return num_written_bytes;
@@ -266,8 +279,8 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 	{
 		handlers.rx_cb(packet.cable_num, &packet.bytes[1], packet.num_midi_bytes);
 	}
-	// LOG_DBG("midi_in_cb ep %d, ep_status %d. read %d bytes %02x %02x %02x %02x \n",
-	//	ep, ep_status, num_read_bytes, buf[0], buf[1], buf[2], buf[3]);
+	printk("rx ");
+	log_packet(&packet);
 	// usb_read(ep, NULL, 0, &bytes_to_read);
 	// LOG_DBG("ep 0x%x, bytes to read %d ", ep, bytes_to_read);
 	// usb_read(ep, loopback_buf, bytes_to_read, NULL);

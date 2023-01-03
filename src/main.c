@@ -28,7 +28,7 @@ void main(void)
 		k_msleep(SLEEP_TIME_MS);
         uint8_t midi_bytes[3] = { is_note_on ? 0x90 : 0x80, 69, 127 };
         // printk("sending bytes\n");
-        usb_midi_tx(0, midi_bytes, 3);
+        usb_midi_tx(1, midi_bytes, 3);
         is_note_on = !is_note_on;
 	}
 }
