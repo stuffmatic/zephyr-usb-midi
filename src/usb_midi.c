@@ -259,8 +259,8 @@ uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byt
 {
 	struct usb_midi_packet packet;
 	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
-	printk("tx ");
-	log_packet(&packet);
+	// printk("tx ");
+	// log_packet(&packet);
 	uint32_t num_written_bytes = 0;
 	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
 	return num_written_bytes;
@@ -278,8 +278,8 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 	{
 		handlers.rx_cb(packet.cable_num, &packet.bytes[1], packet.num_midi_bytes);
 	}
-	printk("rx ");
-	log_packet(&packet);
+	// printk("rx ");
+	// log_packet(&packet);
 	// usb_read(ep, NULL, 0, &bytes_to_read);
 	// LOG_DBG("ep 0x%x, bytes to read %d ", ep, bytes_to_read);
 	// usb_read(ep, loopback_buf, bytes_to_read, NULL);
@@ -314,15 +314,15 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	{
 	/** USB error reported by the controller */
 	case USB_DC_ERROR:
-		printk("USB_DC_ERROR\n");
+		// printk("USB_DC_ERROR\n");
 		break;
 	/** USB reset */
 	case USB_DC_RESET:
-		printk("USB_DC_RESET\n");
+		// printk("USB_DC_RESET\n");
 		break;
 	/** USB connection established, hardware enumeration is completed */
 	case USB_DC_CONNECTED:
-		printk("USB_DC_CONNECTED\n");
+		// printk("USB_DC_CONNECTED\n");
 		break;
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
@@ -344,31 +344,31 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 			handlers.enabled_cb(false);
 		}
 		usb_midi_is_enabled = false;
-		printk("USB_DC_SUSPEND\n");
+		// printk("USB_DC_SUSPEND\n");
 		break;
 	/** USB connection resumed by the HOST */
 	case USB_DC_RESUME:
-		printk("USB_DC_RESUME\n");
+		// printk("USB_DC_RESUME\n");
 		break;
 	/** USB interface selected */
 	case USB_DC_INTERFACE:
-		printk("USB_DC_INTERFACE\n");
+		// printk("USB_DC_INTERFACE\n");
 		break;
 	/** Set Feature ENDPOINT_HALT received */
 	case USB_DC_SET_HALT:
-		printk("USB_DC_SET_HALT\n");
+		// printk("USB_DC_SET_HALT\n");
 		break;
 	/** Clear Feature ENDPOINT_HALT received */
 	case USB_DC_CLEAR_HALT:
-		printk("USB_DC_CLEAR_HALT\n");
+		// printk("USB_DC_CLEAR_HALT\n");
 		break;
 	/** Start of Frame received */
 	case USB_DC_SOF:
-		printk("USB_DC_SOF\n");
+		// printk("USB_DC_SOF\n");
 		break;
 	/** Initial USB connection status */
 	case USB_DC_UNKNOWN:
-		printk("USB_DC_UNKNOWN\n");
+		// printk("USB_DC_UNKNOWN\n");
 		break;
 	}
 }
