@@ -3,6 +3,8 @@
 * logging
 * connect/reconnect sometimes gives USB_DC_RESET
 * notification of data sent
+* device .bMaxPacketSize0 8 as in the spec example gives [00:00:00.557,189] <wrn> usb_device: Failed to write endpoint buffer 0x80. and the device does not enumerate .bMaxPacketSize0 64 seems to work fine (macOS)
+*  <wrn> usb_device: Endpoint 0x01 already enabled, <wrn> usb_device: Endpoint 0x81 already enabled on reconnecting
 
 Inspiration:
 
