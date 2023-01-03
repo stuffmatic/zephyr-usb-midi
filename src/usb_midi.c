@@ -1,97 +1,177 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
+#include <zephyr/logging/log.h>
 #include "usb_midi.h"
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(usb_midi);
+static bool usb_midi_is_enabled = false;
+static struct usb_midi_handlers handlers = {
+	.enabled_cb = NULL,
+	.rx_cb = NULL
+};
 
-static usb_midi_rx_handler rx_handler = NULL;
+enum usb_midi_cin {
+	USB_MIDI_CIN_MISC = 0,
+	USB_MIDI_CIN_CABLE_EVENT       = 1,
+	USB_MIDI_CIN_SYSCOM_2BYTE      = 2, // 2 byte system common message e.g MTC, SongSelect
+	USB_MIDI_CIN_SYSCOM_3BYTE      = 3, // 3 byte system common message e.g SPP
+	USB_MIDI_CIN_SYSEX_START       = 4, // SysEx starts or continue
+	USB_MIDI_CIN_SYSEX_END_1BYTE   = 5, // SysEx ends with 1 data, or 1 byte system common message
+	USB_MIDI_CIN_SYSEX_END_2BYTE   = 6, // SysEx ends with 2 data
+	USB_MIDI_CIN_SYSEX_END_3BYTE   = 7, // SysEx ends with 3 data
+	USB_MIDI_CIN_NOTE_ON           = 8,
+	USB_MIDI_CIN_NOTE_OFF          = 9,
+	USB_MIDI_CIN_POLY_KEYPRESS     = 10,
+	USB_MIDI_CIN_CONTROL_CHANGE    = 11,
+	USB_MIDI_CIN_PROGRAM_CHANGE    = 12,
+	USB_MIDI_CIN_CHANNEL_PRESSURE  = 13,
+	USB_MIDI_CIN_PITCH_BEND_CHANGE = 14,
+	USB_MIDI_CIN_1BYTE_DATA = 15
+};
 
-void usb_midi_register_rx_handler(usb_midi_rx_handler handler) {
-	rx_handler = handler;
-}
+struct usb_midi_packet
+{
+	uint8_t cin;
+	uint8_t cable_num;
+	uint8_t bytes[4];
+	uint8_t num_midi_bytes;
+};
 
-uint32_t usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes, uint8_t midi_byte_count) {
-	uint8_t event_bytes[4] = { 0, 0, 0, 0 };
-	uint8_t cin = (midi_bytes[0] & 0xf0) >> 4;
-	event_bytes[0] = (cable_number << 4) | cin;
-	for (int i = 0; i < midi_byte_count; i++) {
-		if (i > 3) {
-			break;
-		}
-		event_bytes[i + 1] = midi_bytes[i];
+static void packet_from_midi_bytes(uint8_t* midi_bytes, uint8_t num_midi_bytes, uint8_t cable_num, struct usb_midi_packet *packet) {
+	// Compute CIN
+	enum usb_midi_cin cin = 0;
+	uint8_t first_byte = midi_bytes[0];
+
+	// Put cable number and CIN in packet byte 0
+	packet->bytes[0] = (cable_num << 4) | cin;
+
+	// Fill packet bytes 1,2 and 3 with zero padded midi bytes.
+	for (int i = 0; i < 3; i++) {
+		uint8_t midi_byte = i < num_midi_bytes ? midi_bytes[i] : 0;
+		packet->bytes[i + 1] = midi_byte;
 	}
-	uint8_t num_written_bytes = 0;
-	usb_write(0x81, event_bytes, 4, &num_written_bytes);
 }
 
+static void packet_from_usb_bytes(uint8_t packet_bytes[4], struct usb_midi_packet *packet)
+{
+	// LOG_DBG("Parsing packet bytes %02x %02x %02x %02x", packet_bytes[0], packet_bytes[1], packet_bytes[2], packet_bytes[3]);
+
+	packet->num_midi_bytes = 0;
+
+	packet->bytes[0] = packet_bytes[0];
+	packet->bytes[1] = packet_bytes[1];
+	packet->bytes[2] = packet_bytes[2];
+	packet->bytes[3] = packet_bytes[3];
+
+	packet->cable_num = (packet_bytes[0] & 0xf0) >> 4;
+	packet->cin = packet_bytes[0] & 0xf;
+
+	switch (packet->cin)
+	{
+	case USB_MIDI_CIN_MISC:
+	case USB_MIDI_CIN_CABLE_EVENT:
+		// Reserved for future expansion. Set the byte count at 0 to
+		// indicate that this packet should be ignored.
+		// LOG_WRN("Got reserved code index number %d", packet->cin);
+		packet->num_midi_bytes = 0;
+		break;
+	case USB_MIDI_CIN_SYSEX_END_1BYTE:
+	case USB_MIDI_CIN_1BYTE_DATA:
+		packet->num_midi_bytes = 1;
+		break;
+	case USB_MIDI_CIN_SYSCOM_2BYTE:
+	case USB_MIDI_CIN_SYSEX_END_2BYTE:
+	case USB_MIDI_CIN_PROGRAM_CHANGE:
+	case USB_MIDI_CIN_CHANNEL_PRESSURE:
+		packet->num_midi_bytes = 2;
+		break;
+	default:
+		packet->num_midi_bytes = 3;
+		break;
+	}
+
+	// LOG_DBG("Parsed packet cin %d, num_midi_bytes %d", packet->cin, packet->num_midi_bytes);
+}
+
+void usb_midi_register_handlers(struct usb_midi_handlers* h)
+{
+	handlers.enabled_cb = h->enabled_cb;
+	handlers.rx_cb = h->rx_cb;
+}
+
+uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byte_count)
+{
+	struct usb_midi_packet packet;
+	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
+
+	uint32_t num_written_bytes = 0;
+	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
+	return num_written_bytes;
+}
+
+#define NUM_INPUTS CONFIG_USB_MIDI_NUM_INPUTS
+#define NUM_OUTPUTS CONFIG_USB_MIDI_NUM_OUTPUTS
 
 struct usb_midi_ac_if_descriptor
 {
-    uint8_t bLength;            // 0x09 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType;    // 1 0x24 CS_INTERFACE.
-    uint8_t bDescriptorSubtype; // 1 0x01 HEADER subtype.
-    uint16_t bcdADC;            // 2 0x0100 Revision of class specification - 1.0
-    uint16_t wTotalLength;      // 2 0x0009 Total size of class specific descriptors.
-    uint8_t bInCollection;      // 1 0x01 Number of streaming interfaces.
-    uint8_t baInterfaceNr;      // 1 0x01 MIDIStreaming interface 1 belongs to this AudioControl interface.
+	uint8_t bLength;	    // 0x09 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;    // 1 0x24 CS_INTERFACE.
+	uint8_t bDescriptorSubtype; // 1 0x01 HEADER subtype.
+	uint16_t bcdADC;	    // 2 0x0100 Revision of class specification - 1.0
+	uint16_t wTotalLength;	    // 2 0x0009 Total size of class specific descriptors.
+	uint8_t bInCollection;	    // 1 0x01 Number of streaming interfaces.
+	uint8_t baInterfaceNr;	    // 1 0x01 MIDIStreaming interface 1 belongs to this AudioControl interface.
 } __packed;
 
-struct usb_midi_ms_if_descriptor {
-	uint8_t bLength; // 1 0x07 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType; // 1 0x24 CS_INTERFACE descriptor.
-    uint8_t bDescriptorSubtype; // 1 0x01 MS_HEADER subtype.
-    uint16_t BcdADC; // 2 0x0100 Revision of this class specification.
-    uint16_t wTotalLength; // 2 0x0041 Total size of class-specific descriptors .
+struct usb_midi_ms_if_descriptor
+{
+	uint8_t bLength;	    // 1 0x07 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;    // 1 0x24 CS_INTERFACE descriptor.
+	uint8_t bDescriptorSubtype; // 1 0x01 MS_HEADER subtype.
+	uint16_t BcdADC;	    // 2 0x0100 Revision of this class specification.
+	uint16_t wTotalLength;	    // 2 0x0041 Total size of class-specific descriptors .
 } __packed;
 
-struct usb_midi_in_jack_descriptor {
-    uint8_t bLength; // 1 0x06 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType; // 1 0x24 CS_INTERFACE descriptor.
-    uint8_t bDescriptorSubtype; // 1 0x02 MIDI_IN_JACK subtype.
-    uint8_t bJackType; // 1 0x01 EMBEDDED.
-    uint8_t bJackID; // 1 0x01 ID of this Jack.
-    uint8_t iJack; // 1 0x00 Unused
+struct usb_midi_in_jack_descriptor
+{
+	uint8_t bLength;	    // 1 0x06 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;    // 1 0x24 CS_INTERFACE descriptor.
+	uint8_t bDescriptorSubtype; // 1 0x02 MIDI_IN_JACK subtype.
+	uint8_t bJackType;	    // 1 0x01 EMBEDDED.
+	uint8_t bJackID;	    // 1 0x01 ID of this Jack.
+	uint8_t iJack;		    // 1 0x00 Unused
 } __packed;
 
-struct usb_midi_out_jack_descriptor {
-    uint8_t bLength; // 1 0x09 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType; // 1 0x24 CS_INTERFACE descriptor.
-    uint8_t bDescriptorSubtype; // 1 0x03 MIDI_OUT_JACK subtype.
-    uint8_t bJackType; // 1 0x01 EMBEDDED.
-    uint8_t bJackID; // 1 0x03 ID of this Jack.
-    uint8_t bNrInputPins; // 1 0x01 Number of Input Pins of this Jack.
-    uint8_t BaSourceID; //(1) 1 0x02 ID of the Entity to which this Pin is connected.
-    uint8_t BaSourcePin; //(1) 1 0x01 Output Pin number of the Entity to which this Input Pin is connected.
-    uint8_t iJack; // 1 0x00 Unused.
+struct usb_midi_out_jack_descriptor
+{
+	uint8_t bLength;	    // 1 0x09 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;    // 1 0x24 CS_INTERFACE descriptor.
+	uint8_t bDescriptorSubtype; // 1 0x03 MIDI_OUT_JACK subtype.
+	uint8_t bJackType;	    // 1 0x01 EMBEDDED.
+	uint8_t bJackID;	    // 1 0x03 ID of this Jack.
+	uint8_t bNrInputPins;	    // 1 0x01 Number of Input Pins of this Jack.
+	uint8_t BaSourceID;	    //(1) 1 0x02 ID of the Entity to which this Pin is connected.
+	uint8_t BaSourcePin;	    //(1) 1 0x01 Output Pin number of the Entity to which this Input Pin is connected.
+	uint8_t iJack;		    // 1 0x00 Unused.
 } __packed;
 
-struct usb_midi_bulk_out_ep_descriptor {
-    uint8_t bLength; // 1 0x05 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType; // 1 0x25 CS_ENDPOINT descriptor
-    uint8_t bDescriptorSubtype; // 1 0x01 MS_GENERAL subtype.
-    uint8_t bNumEmbMIDIJack; // 1 0x01 Number of embedded MIDI IN Jacks.
-    uint8_t BaAssocJackID; // (1) 1 0x01 ID of the Embedded MIDI IN Jack.
+struct usb_midi_bulk_out_ep_descriptor
+{
+	uint8_t bLength;		    // 1 0x05 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;	    // 1 0x25 CS_ENDPOINT descriptor
+	uint8_t bDescriptorSubtype;	    // 1 0x01 MS_GENERAL subtype.
+	uint8_t bNumEmbMIDIJack;	    // 1 0x01 Number of embedded MIDI IN Jacks.
+	uint8_t BaAssocJackID[NUM_OUTPUTS]; // (1) 1 0x01 ID of the Embedded MIDI IN Jack.
 } __packed;
 
-struct usb_midi_bulk_in_ep_descriptor {
-    uint8_t bLength; //  1 0x05 Size of this descriptor, in bytes.
-    uint8_t bDescriptorType; //  1 0x25 CS_ENDPOINT descriptor
-    uint8_t bDescriptorSubtype; //  1 0x01 MS_GENERAL subtype.
-    uint8_t bNumEmbMIDIJack; //  1 0x01 Number of embedded MIDI OUT Jacks.
-    uint8_t BaAssocJackID; // (1) 1 0x03 ID of the Embedded MIDI OUT Jack.
+struct usb_midi_bulk_in_ep_descriptor
+{
+	uint8_t bLength;		   //  1 0x05 Size of this descriptor, in bytes.
+	uint8_t bDescriptorType;	   //  1 0x25 CS_ENDPOINT descriptor
+	uint8_t bDescriptorSubtype;	   //  1 0x01 MS_GENERAL subtype.
+	uint8_t bNumEmbMIDIJack;	   //  1 0x01 Number of embedded MIDI OUT Jacks.
+	uint8_t BaAssocJackID[NUM_INPUTS]; // (1) 1 0x03 ID of the Embedded MIDI OUT Jack.
 } __packed;
 
-enum usb_midi_cin {
-	CIN_MISC_FUNCTION_CODES = 0x0
-};
-
-struct usb_midi_packet {
-	enum usb_midi_cin cin;
-	uint8_t cable_num;
-	uint8_t num_midi_bytes;
-	uint8_t midi_bytes[4];
-};
 
 #define INIT_AC_CS_IF(num_streaming_ifs, interface_nr)               \
 	{                                                            \
@@ -99,7 +179,7 @@ struct usb_midi_packet {
 		.bDescriptorType = USB_DESC_CS_INTERFACE,            \
 		.bDescriptorSubtype = 0x01,                          \
 		.bcdADC = 0x0100,                                    \
-		.wTotalLength = 0x0009,                              \
+		.wTotalLength = sizeof(struct usb_midi_ac_if_descriptor),                              \
 		.bInCollection = num_streaming_ifs,                  \
 		.baInterfaceNr = interface_nr                        \
 	}
@@ -113,45 +193,50 @@ struct usb_midi_packet {
 		.wTotalLength = total_length                         \
 	}
 
-#define INIT_IN_JACK(jack_id)                                          \
+#define INIT_IN_JACK(jack_id, is_embedded)                             \
 	{                                                              \
 		.bLength = sizeof(struct usb_midi_in_jack_descriptor), \
 		.bDescriptorType = USB_DESC_CS_INTERFACE,              \
 		.bDescriptorSubtype = 0x02,                            \
-		.bJackType = 0x01,                                     \
+		.bJackType = is_embedded ? 0x01 : 0x02,                \
 		.bJackID = jack_id,                                    \
-		.iJack = 0,                                            \
+		.iJack = 0x00,                                         \
 	}
 
-#define INIT_OUT_JACK(jack_id, num_input_pins, source_id, source_pin)   \
+#define INIT_OUT_JACK(jack_id, source_id, is_embedded)                  \
 	{                                                               \
 		.bLength = sizeof(struct usb_midi_out_jack_descriptor), \
 		.bDescriptorType = USB_DESC_CS_INTERFACE,               \
 		.bDescriptorSubtype = 0x03,                             \
-		.bJackType = 0x01,                                      \
+		.bJackType = is_embedded ? 0x01 : 0x02,                 \
 		.bJackID = jack_id,                                     \
-		.bNrInputPins = num_input_pins,                         \
+		.bNrInputPins = 0x01,                                   \
 		.BaSourceID = source_id,                                \
-		.BaSourcePin = source_pin,                              \
+		.BaSourcePin = 0x01,                                    \
 		.iJack = 0x00                                           \
 	}
 
-#define INIT_OUT_EP(num_embedded_in_jacks, embedded_in_jack_id)            \
-	{                                                                  \
-		.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), \
-		.bDescriptorType = USB_DESC_CS_ENDPOINT,                   \
-		.bDescriptorSubtype = 0x01,                                \
-		.bNumEmbMIDIJack = num_embedded_in_jacks,                  \
-		.BaAssocJackID = embedded_in_jack_id                       \
+#define JACK_ID(x, first_id) (x + first_id)
+#define INIT_OUT_EP(num_embedded_in_jacks, embedded_in_jack_id)                  \
+	{                                                                        \
+		.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor),       \
+		.bDescriptorType = USB_DESC_CS_ENDPOINT,                         \
+		.bDescriptorSubtype = 0x01,                                      \
+		.bNumEmbMIDIJack = num_embedded_in_jacks,                        \
+		.BaAssocJackID = {                                               \
+			LISTIFY(NUM_OUTPUTS, JACK_ID, (, ), embedded_in_jack_id) \
+		}                                                                \
 	}
 
-#define INIT_IN_EP(num_embedded_out_jacks, embedded_out_jack_id)          \
-	{                                                                 \
-		.bLength = sizeof(struct usb_midi_bulk_in_ep_descriptor), \
-		.bDescriptorType = USB_DESC_CS_ENDPOINT,                  \
-		.bDescriptorSubtype = 0x01,                               \
-		.bNumEmbMIDIJack = num_embedded_out_jacks,                \
-		.BaAssocJackID = embedded_out_jack_id                     \
+#define INIT_IN_EP(num_embedded_out_jacks, embedded_out_jack_id)                 \
+	{                                                                        \
+		.bLength = sizeof(struct usb_midi_bulk_in_ep_descriptor),        \
+		.bDescriptorType = USB_DESC_CS_ENDPOINT,                         \
+		.bDescriptorSubtype = 0x01,                                      \
+		.bNumEmbMIDIJack = num_embedded_out_jacks,                       \
+		.BaAssocJackID = {                                               \
+			LISTIFY(NUM_INPUTS, JACK_ID, (, ), embedded_out_jack_id) \
+		}                                                                \
 	}
 
 #define INIT_DEVICE_DESC                                           \
@@ -186,25 +271,45 @@ struct usb_midi_packet {
 
 struct usb_midi_config
 {
-	struct usb_device_descriptor dev;	   // size 18
-						   // Size below: 39 + 9 + 9 + 9 + 9 + 7
+	struct usb_device_descriptor dev; // size 18
+					  // Size below: 39 + 9 + 9 + 9 + 9 + 7
 	struct usb_cfg_descriptor cfg;		   // size 9
 	struct usb_if_descriptor ac_if;		   // size 9
 	struct usb_midi_ac_if_descriptor ac_cs_if; // size 9
 	struct usb_if_descriptor ms_if;		   // size 9
 	struct usb_midi_ms_if_descriptor ms_cs_if; // size 7
 	// Size below: 39
-	struct usb_midi_in_jack_descriptor in_jack;	  // size 6
-	struct usb_midi_out_jack_descriptor out_jack;	  // size 9
-	struct usb_ep_descriptor out_ep;		  // size 7 (NOTE: Says 9 in the spec example)
-	struct usb_midi_bulk_out_ep_descriptor out_cs_ep; // size 5
-	struct usb_ep_descriptor in_ep;			  // size 7 (NOTE: Says 9 in the spec example)
-	struct usb_midi_bulk_in_ep_descriptor in_cs_ep;	  // size 5
+	struct usb_midi_in_jack_descriptor in_jacks_ext[NUM_INPUTS];	// size 6
+	struct usb_midi_out_jack_descriptor out_jacks_emb[NUM_INPUTS];	// size 9
+	struct usb_midi_out_jack_descriptor out_jacks_ext[NUM_OUTPUTS]; // size 9
+	struct usb_midi_in_jack_descriptor in_jacks_emb[NUM_OUTPUTS];	// size 6
+	struct usb_ep_descriptor out_ep;				// size 7 (NOTE: Says 9 in the spec example)
+	struct usb_midi_bulk_out_ep_descriptor out_cs_ep;		// size 5
+	struct usb_ep_descriptor in_ep;					// size 7 (NOTE: Says 9 in the spec example)
+	struct usb_midi_bulk_in_ep_descriptor in_cs_ep;			// size 5
 } __packed;
 
 #define NUM_ENDPOINTS 2
-#define MIDI_MS_IF_DESC_TOTAL_SIZE 39
-#define CFG_TOTAL_LENGTH (MIDI_MS_IF_DESC_TOTAL_SIZE + 9 + 9 + 9 + 9 + 7)
+#define MIDI_MS_IF_DESC_TOTAL_SIZE                                          \
+	(                                                                   \
+	    sizeof(struct usb_midi_in_jack_descriptor) * NUM_INPUTS +   \
+	    sizeof(struct usb_midi_out_jack_descriptor) * NUM_INPUTS +   \
+	    sizeof(struct usb_midi_in_jack_descriptor) * NUM_OUTPUTS +   \
+	    sizeof(struct usb_midi_out_jack_descriptor) * NUM_OUTPUTS +   \
+	    sizeof(struct usb_ep_descriptor) +                              \
+	    sizeof(struct usb_midi_bulk_out_ep_descriptor) +                \
+	    sizeof(struct usb_ep_descriptor) +                              \
+	    sizeof(struct usb_midi_bulk_in_ep_descriptor))
+#define CFG_TOTAL_LENGTH                               \
+	(                                              \
+	    sizeof(struct usb_cfg_descriptor) +        \
+	    sizeof(struct usb_if_descriptor) +         \
+	    sizeof(struct usb_midi_ac_if_descriptor) + \
+	    sizeof(struct usb_if_descriptor) +         \
+	    sizeof(struct usb_midi_ms_if_descriptor) + \
+	    MIDI_MS_IF_DESC_TOTAL_SIZE)
+
+BUILD_ASSERT(sizeof(struct usb_midi_config) == (CFG_TOTAL_LENGTH + sizeof(struct usb_device_descriptor)), "");
 
 USBD_DEVICE_DESCR_DEFINE(primary)
 struct usb_midi_config usb_midi_device_descr = {
@@ -227,142 +332,71 @@ struct usb_midi_config usb_midi_device_descr = {
 	      .bInterfaceProtocol = 0x00,
 	      .iInterface = 0x00},
     .ms_cs_if = INIT_MS_CS_IF(MIDI_MS_IF_DESC_TOTAL_SIZE),
-    .in_jack = INIT_IN_JACK(0x01),
-    .out_jack = INIT_OUT_JACK(0x02, 0x01, 0x02, 0x01),
+    .in_jacks_ext = {
+			INIT_IN_JACK(0x01, 0),
+    },
+    .out_jacks_emb = {
+			INIT_OUT_JACK(0x02, 0x01, 1),
+    },
+    .out_jacks_ext = {
+			INIT_OUT_JACK(0x03, 0x05, 0),
+			INIT_OUT_JACK(0x04, 0x06, 0),
+    },
+    .in_jacks_emb = {
+			INIT_IN_JACK(0x05, 1),
+			INIT_IN_JACK(0x06, 1),
+    },
     .out_ep = {.bLength = sizeof(struct usb_ep_descriptor), .bDescriptorType = USB_DESC_ENDPOINT, .bEndpointAddress = 0x01, .bmAttributes = 0x02, .wMaxPacketSize = 0x0040, .bInterval = 0x00},
-    .out_cs_ep = INIT_OUT_EP(0x01, 0x01),
+    .out_cs_ep = INIT_OUT_EP(NUM_OUTPUTS, 0x05),
     .in_ep = {.bLength = sizeof(struct usb_ep_descriptor), .bDescriptorType = USB_DESC_ENDPOINT, .bEndpointAddress = 0x81, .bmAttributes = 0x02, .wMaxPacketSize = 0x0040, .bInterval = 0x00},
-    .in_cs_ep = INIT_IN_EP(0x01, 0x02),
+    .in_cs_ep = INIT_IN_EP(NUM_INPUTS, 0x02),
 };
 
-static void parse_packet(uint8_t packet_bytes[4], struct usb_midi_packet *packet) {
-	LOG_DBG("Parsing packet bytes %02x %02x %02x %02x", packet_bytes[0], packet_bytes[1], packet_bytes[2], packet_bytes[3]);
-
-	packet->num_midi_bytes = 0;
-
-	packet->midi_bytes[0] = packet_bytes[0];
-	packet->midi_bytes[1] = packet_bytes[1];
-	packet->midi_bytes[2] = packet_bytes[2];
-	packet->midi_bytes[3] = packet_bytes[3];
-
-	packet->cable_num = (packet_bytes[0] & 0xf0) >> 4;
-	packet->cin = packet_bytes[0] & 0xf;
-
-	switch (packet->cin)
-	{
-	// Miscellaneous function codes
-	case 0x0:
-	// Cable events
-	case 0x1:
-		// Reserved for future expansion
-		LOG_WRN("Got reserved code index number %d", packet->cin);
-		break;
-	// Two-byte System Common messages like MTC, SongSelect, etc.
-	case 0x2:
-		packet->num_midi_bytes = 2;
-		break;
-	// Three-byte System Common messages like SPP, etc.
-	case 0x3:
-		packet->num_midi_bytes = 3;
-		break;
-	// SysEx starts or continues
-	case 0x4:
-		packet->num_midi_bytes = 3;
-		break;
-	// Single-byte System Common Message or
-	// SysEx ends with following single byte.
-	case 0x5:
-		packet->num_midi_bytes = 1;
-		break;
-	// SysEx ends with following two bytes.
-	case 0x6:
-		packet->num_midi_bytes = 2;
-		break;
-	// SysEx ends with following three bytes.
-	case 0x7:
-		packet->num_midi_bytes = 3;
-		break;
-	// Note-off
-	case 0x8:
-		packet->num_midi_bytes = 3;
-		break;
-	// Note-on
-	case 0x9:
-		packet->num_midi_bytes = 3;
-		break;
-	// Poly-KeyPress
-	case 0xa:
-		packet->num_midi_bytes = 3;
-		break;
-	// Control Change
-	case 0xb:
-		packet->num_midi_bytes = 3;
-		break;
-	// Program Change
-	case 0xc:
-		packet->num_midi_bytes = 2;
-		break;
-	// Channel Pressure
-	case 0xd:
-		packet->num_midi_bytes = 2;
-		break;
-	// PitchBend Change
-	case 0xe:
-		packet->num_midi_bytes = 3;
-		break;
-	// Single Byte
-	case 0xf:
-		packet->num_midi_bytes = 1;
-		break;
-	default:
-		break;
-	}
-
-	LOG_DBG("Parsed packet cin %d, num_midi_bytes %d", packet->cin, packet->num_midi_bytes);
-}
-
-static void midi_in_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
-				       ep_status)
+static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
+					   ep_status)
 {
 	uint8_t buf[4];
 	uint32_t num_read_bytes = 0;
 	usb_read(ep, buf, 4, &num_read_bytes);
 	struct usb_midi_packet packet;
-	parse_packet(buf, &packet);
-	if (rx_handler && packet.num_midi_bytes)
+	packet_from_usb_bytes(buf, &packet);
+	if (handlers.rx_cb && packet.num_midi_bytes)
 	{
-		rx_handler(packet.cable_num, packet.midi_bytes, packet.num_midi_bytes);
+		handlers.rx_cb(packet.cable_num, &packet.bytes[1], packet.num_midi_bytes);
 	}
-	LOG_DBG("midi_in_cb ep %d, ep_status %d. read %d bytes %02x %02x %02x %02x \n",
-	       ep, ep_status, num_read_bytes, buf[0], buf[1], buf[2], buf[3]);
+	// LOG_DBG("midi_in_cb ep %d, ep_status %d. read %d bytes %02x %02x %02x %02x \n",
+	//	ep, ep_status, num_read_bytes, buf[0], buf[1], buf[2], buf[3]);
 	// usb_read(ep, NULL, 0, &bytes_to_read);
 	// LOG_DBG("ep 0x%x, bytes to read %d ", ep, bytes_to_read);
 	// usb_read(ep, loopback_buf, bytes_to_read, NULL);
 }
 
-static void midi_out_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
-					ep_status)
+static void midi_in_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
+					  ep_status)
 {
 
-	LOG_DBG("midi_out_cb ep %d, ep_status %d\n", ep, ep_status);
+	// LOG_DBG("midi_out_cb ep %d, ep_status %d\n", ep, ep_status);
 	/* if (usb_write(ep, loopback_buf, CONFIG_LOOPBACK_BULK_EP_MPS,
-      NULL)) {
-	  LOG_DBG("ep 0x%x", ep);
+			NULL)) {
+		LOG_DBG("ep 0x%x", ep);
 	} */
 }
 
 static struct usb_ep_cfg_data midi_ep_cfg[] = {
     {
-	.ep_cb = midi_out_cb,
+	.ep_cb = midi_in_ep_cb,
 	.ep_addr = 0x81,
     },
     {
-	.ep_cb = midi_in_cb,
+	.ep_cb = midi_out_ep_cb,
 	.ep_addr = 0x01,
     },
 };
 
-void usb_status_callback(enum usb_dc_status_code cb_status, const uint8_t *param)
+
+void usb_status_callback(struct usb_cfg_data *cfg,
+			enum usb_dc_status_code cb_status,
+			const uint8_t *param)
 {
 	switch (cb_status)
 	{
@@ -380,14 +414,22 @@ void usb_status_callback(enum usb_dc_status_code cb_status, const uint8_t *param
 		break;
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
-		printk("USB_DC_CONFIGURED\n");
+		if (!usb_midi_is_enabled && handlers.enabled_cb) {
+			handlers.enabled_cb(true);
+		}
+		usb_midi_is_enabled = true;
+		// printk("USB_DC_CONFIGURED\n");
 		break;
 	/** USB connection lost */
 	case USB_DC_DISCONNECTED:
-		printk("USB_DC_DISCONNECTED\n");
+		// printk("USB_DC_DISCONNECTED\n");
 		break;
 	/** USB connection suspended by the HOST */
 	case USB_DC_SUSPEND:
+		if (usb_midi_is_enabled && handlers.enabled_cb) {
+			handlers.enabled_cb(false);
+		}
+		usb_midi_is_enabled = false;
 		printk("USB_DC_SUSPEND\n");
 		break;
 	/** USB connection resumed by the HOST */

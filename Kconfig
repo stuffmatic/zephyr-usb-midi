@@ -1,0 +1,9 @@
+source "Kconfig.zephyr"
+
+config USB_MIDI_NUM_INPUTS
+  int "Number of USB MIDI inputs"
+	default 1
+
+config USB_MIDI_NUM_OUTPUTS
+  int "Number of USB MIDI outputs"
+	default 1
