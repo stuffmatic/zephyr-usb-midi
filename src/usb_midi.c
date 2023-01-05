@@ -184,15 +184,14 @@ struct usb_midi_config usb_midi_config_data = {
 		.ac_cs_if = INIT_AC_CS_IF,
 		.ms_if = INIT_MS_IF,
 		.ms_cs_if = INIT_MS_CS_IF(MIDI_MS_IF_DESC_TOTAL_SIZE),
-		.in_jacks_ext = {
-				LISTIFY(USB_MIDI_NUM_INPUTS, INIT_IN_JACK, (, ), 0, USB_MIDI_JACK_TYPE_EXTERNAL)},
-		.in_jacks_emb = {LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_IN_JACK, (, ), USB_MIDI_NUM_INPUTS, USB_MIDI_JACK_TYPE_EMBEDDED)},
-		.out_jacks_emb = {LISTIFY(USB_MIDI_NUM_INPUTS, INIT_OUT_JACK, (, ), USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS, 0, USB_MIDI_JACK_TYPE_EMBEDDED)},
-		.out_jacks_ext = {LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_OUT_JACK, (, ), USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS, USB_MIDI_NUM_INPUTS, USB_MIDI_JACK_TYPE_EXTERNAL)},
+		.in_jacks_ext = { LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_IN_JACK, (, ), 0, USB_MIDI_JACK_TYPE_EXTERNAL)},
+		.in_jacks_emb = { LISTIFY(USB_MIDI_NUM_INPUTS, INIT_IN_JACK, (, ), USB_MIDI_NUM_OUTPUTS, USB_MIDI_JACK_TYPE_EMBEDDED)},
+		.out_jacks_emb = { LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_OUT_JACK, (, ), USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS, 0, USB_MIDI_JACK_TYPE_EMBEDDED)},
+		.out_jacks_ext = { LISTIFY(USB_MIDI_NUM_INPUTS, INIT_OUT_JACK, (, ), USB_MIDI_NUM_INPUTS + 2 * USB_MIDI_NUM_OUTPUTS, USB_MIDI_NUM_OUTPUTS, USB_MIDI_JACK_TYPE_EXTERNAL)},
 		.out_ep = INIT_OUT_EP,
-		.out_cs_ep = INIT_OUT_CS_EP(USB_MIDI_NUM_INPUTS, USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS + 1),
+		.out_cs_ep = INIT_OUT_CS_EP(USB_MIDI_NUM_INPUTS, USB_MIDI_NUM_OUTPUTS + 1),
 		.in_ep = INIT_IN_EP,
-		.in_cs_ep = INIT_IN_CS_EP(USB_MIDI_NUM_OUTPUTS, USB_MIDI_NUM_INPUTS + 1),
+		.in_cs_ep = INIT_IN_CS_EP(USB_MIDI_NUM_OUTPUTS, USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS + 1),
 };
 
 static bool usb_midi_is_enabled = false;
@@ -274,17 +273,6 @@ void usb_midi_register_handlers(struct usb_midi_handlers *h)
 {
 	handlers.enabled_cb = h->enabled_cb;
 	handlers.rx_cb = h->rx_cb;
-}
-
-uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byte_count)
-{
-	struct usb_midi_packet packet;
-	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
-	// printk("tx ");
-	// log_packet(&packet);
-	uint32_t num_written_bytes = 0;
-	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
-	return num_written_bytes;
 }
 
 static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
@@ -392,6 +380,17 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		// printk("USB_DC_UNKNOWN\n");
 		break;
 	}
+}
+
+uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byte_count)
+{
+	struct usb_midi_packet packet;
+	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
+	// printk("tx ");
+	// log_packet(&packet);
+	uint32_t num_written_bytes = 0;
+	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
+	return num_written_bytes;
 }
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {

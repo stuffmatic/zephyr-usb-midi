@@ -185,10 +185,10 @@ struct usb_midi_config
         struct usb_midi_ac_if_descriptor ac_cs_if;
         struct usb_if_descriptor ms_if;
         struct usb_midi_ms_if_descriptor ms_cs_if;
-        struct usb_midi_in_jack_descriptor in_jacks_ext[USB_MIDI_NUM_INPUTS];
-        struct usb_midi_in_jack_descriptor in_jacks_emb[USB_MIDI_NUM_OUTPUTS];
-        struct usb_midi_out_jack_descriptor out_jacks_emb[USB_MIDI_NUM_INPUTS];
-        struct usb_midi_out_jack_descriptor out_jacks_ext[USB_MIDI_NUM_OUTPUTS];
+        struct usb_midi_in_jack_descriptor in_jacks_ext[USB_MIDI_NUM_OUTPUTS];
+        struct usb_midi_in_jack_descriptor in_jacks_emb[USB_MIDI_NUM_INPUTS];
+        struct usb_midi_out_jack_descriptor out_jacks_emb[USB_MIDI_NUM_OUTPUTS];
+        struct usb_midi_out_jack_descriptor out_jacks_ext[USB_MIDI_NUM_INPUTS];
         struct usb_ep_descriptor out_ep;
         struct usb_midi_bulk_out_ep_descriptor out_cs_ep;
         struct usb_ep_descriptor in_ep;
