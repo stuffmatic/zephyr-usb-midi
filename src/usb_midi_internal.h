@@ -132,6 +132,18 @@ struct usb_midi_out_jack_descriptor
         uint8_t iJack;
 } __packed;
 
+struct usb_ep_descriptor_padded
+{
+        uint8_t bLength;
+        uint8_t bDescriptorType;
+        uint8_t bEndpointAddress;
+        uint8_t bmAttributes;
+        uint16_t wMaxPacketSize;
+        uint8_t bInterval;
+        uint8_t bRefresh;
+        uint8_t bSynchAddress;
+} __packed;
+
 // Class-Specific MS Bulk Data Endpoint Descriptor corresponding to a MIDI output.
 // See table 6-7 in the spec.
 struct usb_midi_bulk_out_ep_descriptor
@@ -189,9 +201,9 @@ struct usb_midi_config
         struct usb_midi_in_jack_descriptor in_jacks_emb[USB_MIDI_NUM_INPUTS];
         struct usb_midi_out_jack_descriptor out_jacks_emb[USB_MIDI_NUM_OUTPUTS];
         struct usb_midi_out_jack_descriptor out_jacks_ext[USB_MIDI_NUM_INPUTS];
-        struct usb_ep_descriptor out_ep;
+        struct usb_ep_descriptor_padded out_ep;
         struct usb_midi_bulk_out_ep_descriptor out_cs_ep;
-        struct usb_ep_descriptor in_ep;
+        struct usb_ep_descriptor_padded in_ep;
         struct usb_midi_bulk_in_ep_descriptor in_cs_ep;
 } __packed;
 

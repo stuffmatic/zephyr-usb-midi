@@ -64,12 +64,14 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 
 #define INIT_OUT_EP                              \
 	{                                              \
-		.bLength = sizeof(struct usb_ep_descriptor), \
+		.bLength = sizeof(struct usb_ep_descriptor_padded), \
 		.bDescriptorType = USB_DESC_ENDPOINT,        \
 		.bEndpointAddress = 0x01,                    \
 		.bmAttributes = 0x02,                        \
 		.wMaxPacketSize = 0x0040,                    \
-		.bInterval = 0x00                            \
+		.bInterval = 0x00,                            \
+		.bRefresh = 0x00, \
+    .bSynchAddress = 0x00, \
 	}
 
 #define JACK_ID(x, first_id) (x + first_id)
@@ -86,12 +88,14 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 
 #define INIT_IN_EP                               \
 	{                                              \
-		.bLength = sizeof(struct usb_ep_descriptor), \
+		.bLength = sizeof(struct usb_ep_descriptor_padded), \
 		.bDescriptorType = USB_DESC_ENDPOINT,        \
 		.bEndpointAddress = 0x81,                    \
 		.bmAttributes = 0x02,                        \
 		.wMaxPacketSize = 0x0040,                    \
-		.bInterval = 0x00                            \
+		.bInterval = 0x00,                            \
+		.bRefresh = 0x00, \
+    .bSynchAddress = 0x00, \
 	}
 
 #define INIT_IN_CS_EP(num_embedded_jacks, embedded_out_jack_id)        \
@@ -159,9 +163,9 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 			sizeof(struct usb_midi_out_jack_descriptor) * USB_MIDI_NUM_INPUTS +  \
 			sizeof(struct usb_midi_in_jack_descriptor) * USB_MIDI_NUM_OUTPUTS +  \
 			sizeof(struct usb_midi_out_jack_descriptor) * USB_MIDI_NUM_OUTPUTS + \
-			sizeof(struct usb_ep_descriptor) +                                   \
+			sizeof(struct usb_ep_descriptor_padded) +                                   \
 			sizeof(struct usb_midi_bulk_out_ep_descriptor) +                     \
-			sizeof(struct usb_ep_descriptor) +                                   \
+			sizeof(struct usb_ep_descriptor_padded) +                                   \
 			sizeof(struct usb_midi_bulk_in_ep_descriptor))
 
 // Value for the wTotalLength field of the Configuration Descriptor.
