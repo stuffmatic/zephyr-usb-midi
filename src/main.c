@@ -3,7 +3,7 @@
 #include <zephyr/drivers/gpio.h>
 #include "usb_midi.h"
 
-#define SLEEP_TIME_MS 1000
+#define SLEEP_TIME_MS 300
 #define LED0_NODE DT_ALIAS(led0)
 #define LED1_NODE DT_ALIAS(led1)
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
@@ -49,6 +49,7 @@ void main(void)
 	uint8_t cable_num = 0;
 	uint8_t note_num = 69;
 	uint8_t note_vel = 127;
+
 	while (1)
 	{
 		if (usb_midi_is_enabled)
@@ -56,6 +57,9 @@ void main(void)
 			uint8_t midi_bytes[3] = {is_note_on ? 0x90 : 0x80, note_num, note_vel};
 			usb_midi_tx(cable_num, midi_bytes, 3);
 			is_note_on = !is_note_on;
+			if (is_note_on) {
+				cable_num = (cable_num + 1) % CONFIG_USB_MIDI_NUM_OUTPUTS;
+			}
 		}
 		k_msleep(SLEEP_TIME_MS);
 	}
