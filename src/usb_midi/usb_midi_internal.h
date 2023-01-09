@@ -3,10 +3,10 @@
 
 #include <zephyr/init.h>
 
-// A USB MIDI data packet.
+/* A USB MIDI data packet. */
 struct usb_midi_packet
 {
-        uint8_t cin;
+        uint8_t cin; /* code index number */
         uint8_t cable_num;
         uint8_t bytes[4];
         uint8_t num_midi_bytes;
@@ -132,6 +132,7 @@ struct usb_midi_out_jack_descriptor
         uint8_t iJack;
 } __packed;
 
+/* same as usb_ep_descriptor but with two additional fields */
 struct usb_ep_descriptor_padded
 {
         uint8_t bLength;

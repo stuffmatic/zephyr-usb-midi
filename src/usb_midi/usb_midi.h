@@ -6,7 +6,7 @@
 /* A function to call when MIDI data has been received. */
 typedef void (*usb_midi_rx_cb)(uint8_t cable_number, uint8_t* midi_bytes, uint8_t midi_byte_count);
 /* A function to call when the USB MIDI device becomes available/unavailable. */
-typedef void (*usb_midi_enabled_cb)(bool is_available);
+typedef void (*usb_midi_enabled_cb)(bool is_available); // TODO: rename to available, online or connected?
 
 struct usb_midi_handlers {
     usb_midi_rx_cb rx_cb;

@@ -1,7 +1,7 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
-#include "usb_midi.h"
+#include "usb_midi/usb_midi.h"
 
 #define SLEEP_TIME_MS 300
 #define LED0_NODE DT_ALIAS(led0)

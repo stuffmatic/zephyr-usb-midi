@@ -1,10 +1,56 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
+#include <usb_descriptor.h>
 #include <zephyr/logging/log.h>
 #include "usb_midi.h"
 #include "usb_midi_internal.h"
 
+// TODO: is this needed?
 BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 ports");
+
+#ifdef CONFIG_USB_MIDI_USE_CUSTOM_JACK_NAMES
+
+#define INPUT_JACK_STRING_DESCR_IDX(jack_idx) jack_idx
+#define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) (jack_idx + USB_MIDI_NUM_INPUTS)
+
+#define INPUT_JACK_STRING_DESCR_TYPE(jack_number, x) \
+struct input_jack_##jack_number##_string_descr_type { \
+	uint8_t bLength; \
+	uint8_t bDescriptorType; \
+	uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME)]; \
+} __packed;
+
+#define OUTPUT_JACK_STRING_DESCR_TYPE(jack_number, x) \
+struct output_jack_##jack_number##_string_descr_type { \
+	uint8_t bLength; \
+	uint8_t bDescriptorType; \
+	uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME)]; \
+} __packed;
+
+#define INPUT_JACK_STRING_DESCR(jack_number, x) \
+USBD_STRING_DESCR_USER_DEFINE(primary); \
+struct input_jack_##jack_number##_string_descr_type input_jack_##jack_number##_string_descr = { \
+	.bLength = USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME), \
+	.bDescriptorType = USB_DESC_STRING, \
+	.bString = CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME \
+};
+
+#define OUTPUT_JACK_STRING_DESCR(jack_number, x) \
+USBD_STRING_DESCR_USER_DEFINE(primary); \
+struct output_jack_##jack_number##_string_descr_type output_jack_##jack_number##_string_descr = { \
+	.bLength = USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME), \
+	.bDescriptorType = USB_DESC_STRING, \
+	.bString = CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME \
+};
+
+LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR_TYPE, ( ))
+LISTIFY(USB_MIDI_NUM_OUTPUTS, INPUT_JACK_STRING_DESCR_TYPE, ( ))
+LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ( ))
+LISTIFY(USB_MIDI_NUM_OUTPUTS, INPUT_JACK_STRING_DESCR, ( ))
+#elif
+#define INPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
+#define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
+#endif
 
 #define INIT_AC_CS_IF                                         \
 	{                                                           \
@@ -46,7 +92,7 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 		.bDescriptorSubtype = 0x02,                            \
 		.bJackType = jack_type,                                \
 		.bJackID = 1 + idx + idx_offset,                       \
-		.iJack = 0x00,                                         \
+		.iJack = 0x04,                                         \
 	}
 
 #define INIT_OUT_JACK(idx, jack_id_idx_offset, source_id_idx_offset, jack_type) \
@@ -59,7 +105,7 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 		.bNrInputPins = 0x01,                                                       \
 		.BaSourceID = 1 + idx + source_id_idx_offset,                               \
 		.BaSourcePin = 0x01,                                                        \
-		.iJack = 0x00                                                               \
+		.iJack = 0x04                                                               \
 	}
 
 #define INIT_OUT_EP                              \
@@ -180,7 +226,7 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 
 BUILD_ASSERT(sizeof(struct usb_midi_config) == (CFG_TOTAL_LENGTH + sizeof(struct usb_device_descriptor)), "");
 
-USBD_DEVICE_DESCR_DEFINE(primary)
+USBD_DEVICE_DESCR_DEFINE(primary) // TODO: why primary?
 struct usb_midi_config usb_midi_config_data = {
 		.dev = INIT_DEVICE_DESC,
 		.cfg = INIT_CFG_DESC(CFG_TOTAL_LENGTH),
