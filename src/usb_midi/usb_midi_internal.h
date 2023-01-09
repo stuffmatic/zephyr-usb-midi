@@ -63,6 +63,11 @@ enum usb_midi_jack_type
         USB_MIDI_JACK_TYPE_EXTERNAL = 0x02
 };
 
+struct usb_midi_input_pin {
+        uint8_t baSourceID;
+        uint8_t baSourcePin;
+} __packed;
+
 // Class-specific AC (audio control) Interface Descriptor.
 struct usb_midi_ac_if_descriptor
 {
@@ -124,10 +129,8 @@ struct usb_midi_out_jack_descriptor
         uint8_t bJackID;
         // Number of Input Pins of this MIDI OUT Jack (assumed to be 1 in this implementation).
         uint8_t bNrInputPins;
-        // ID of the Entity to which the first Input Pin of this MIDI OUT Jack is connected.
-        uint8_t BaSourceID;
-        // Output Pin number of the Entity to which the first Input Pin of this MIDI OUT Jack is connected.
-        uint8_t BaSourcePin;
+        // ID and source pin of the entity to which this jack is connected.
+        struct usb_midi_input_pin input_pin;
         // Index of a string descriptor, describing the MIDI OUT Jack.
         uint8_t iJack;
 } __packed;
@@ -167,29 +170,30 @@ struct usb_midi_bulk_in_ep_descriptor
         uint8_t BaAssocJackID[USB_MIDI_NUM_OUTPUTS];
 } __packed;
 
+#define ELEMENT_CAPS_COUNT 1
+
 // Element descriptor.
 // See table 6-5 in the spec.
-/* struct usb_midi_element_descriptor
-{
-        uint8_t bLength;
-        uint8_t bDescriptorType;
-        uint8_t bDescriptorSubtype;
-        uint8_t bElementID;
-        uint8_t bNrInputPins;
-        {
-            uint8_t baSourceID
-                uint8_t baSourcePin}[NUM_ELEMENT_INPUTS];
-        uint8_t bNrOutputPins;
-        uint8_t bInTerminalLink;
-        uint8_t bOutTerminalLink;
-        uint8_t bElCapsSize;
-        uint8_t bmElementCaps[ELEMENT_CAPS_COUNT];
-        uint8_t iElement;
-} __packed; */
+struct usb_midi_element_descriptor
+ {
+         uint8_t bLength;
+         uint8_t bDescriptorType;
+         uint8_t bDescriptorSubtype;
+         uint8_t bElementID;
+         uint8_t bNrInputPins;
 
-// A complete set of descriptors for a USB MIDI device.
-// Similar to the example in appendix B of the spec, but
-// adapted to support any valid numbers of input and output ports.
+        struct usb_midi_input_pin input_pins[USB_MIDI_NUM_INPUTS];
+         uint8_t bNrOutputPins;
+         uint8_t bInTerminalLink;
+         uint8_t bOutTerminalLink;
+         uint8_t bElCapsSize;
+        uint8_t bmElementCaps[ELEMENT_CAPS_COUNT];
+         uint8_t iElement;
+} __packed;
+
+
+// A complete set of descriptors for a USB MIDI device without
+// physical jacks.
 struct usb_midi_config
 {
         struct usb_device_descriptor dev;
@@ -198,14 +202,14 @@ struct usb_midi_config
         struct usb_midi_ac_if_descriptor ac_cs_if;
         struct usb_if_descriptor ms_if;
         struct usb_midi_ms_if_descriptor ms_cs_if;
-        struct usb_midi_in_jack_descriptor in_jacks_ext[USB_MIDI_NUM_OUTPUTS];
         struct usb_midi_in_jack_descriptor in_jacks_emb[USB_MIDI_NUM_INPUTS];
         struct usb_midi_out_jack_descriptor out_jacks_emb[USB_MIDI_NUM_OUTPUTS];
-        struct usb_midi_out_jack_descriptor out_jacks_ext[USB_MIDI_NUM_INPUTS];
+        struct usb_midi_element_descriptor element;
         struct usb_ep_descriptor_padded out_ep;
         struct usb_midi_bulk_out_ep_descriptor out_cs_ep;
         struct usb_ep_descriptor_padded in_ep;
         struct usb_midi_bulk_in_ep_descriptor in_cs_ep;
+
 } __packed;
 
 #endif

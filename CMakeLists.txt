@@ -5,4 +5,4 @@ cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zephyr-usb-midi)
 
-target_sources(app PRIVATE src/main.c src/usb_midi.c src/usb_midi/usb_midi.c)
+target_sources(app PRIVATE src/main.c src/usb_midi/usb_midi.c)

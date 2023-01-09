@@ -7,6 +7,7 @@
 *  <wrn> usb_device: Endpoint 0x01 already enabled, <wrn> usb_device: Endpoint 0x81 already enabled on reconnecting
 * https://github.com/kcuzner/midi-fader/blob/master/firmware/src/usb_midi.c
 * port naming: USB_MIDI_CUSTOM_JACK_NAMES, USB_MIDI_OUT_1_NAME, USB_MIDI_OUT_2_NAME ... etc
+* make CONFIG_USB_MIDI_INPUT_JACK_0_NAME depend on enable jack names var
 
 Inspiration:
 

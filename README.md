@@ -6,12 +6,12 @@ The implementation in its current state should be usable but __is still work in 
 
 * testing on different boards
 * testing compatibility with different host operating systems
-* finding, [reporting](https://github.com/stuffmatic/zephyr-usb-midi/issues) and fixing bugs
+* finding, [reporting](https://github.com/stuffmatic/zephyr-usb-midi/issues/new) and fixing bugs
 * suggesting and implementing improvments
 
 ## Usage
 
-The public API is defined in [usb_midi.h](src/usb_midi.h).
+The public API is defined in [usb_midi.h](src/usb_midi/usb_midi.h).
 
 To try out the code in your own app, grab the code in [`src/usb_midi`](src/usb_midi), make sure you declare the config vars from [`Kconfig`](Kconfig) and set `CONFIG_USB_DEVICE_STACK=y` in your `.conf` file. 
 
@@ -29,7 +29,7 @@ The [USB MIDI 1.0 spec](https://www.usb.org/sites/default/files/midi10.pdf) allo
 
 The spec is thin on topology examples and only provides one for a MIDI adapter (see appendix B) with external input and output jacks that are connected to embedded ouput and input jacks respectively. This topology seems fairly common in open source implementations, but does not seem ideal for devices without without physical MIDI jacks. This implementation uses embedded input and output jacks connected to an element entity corresponding to the device, assuming the most common device type is one without physical jacks.
 
-It is not entirely clear to me how the device topology (beyond the embedded jacks) is reflected in various hosts. If you have any examples, I'd be interested to know, so feel free to [post them in an issue](https://github.com/stuffmatic/zephyr-usb-midi/issues).
+It is not entirely clear to me how the device topology (beyond the embedded jacks) is reflected in various hosts. If you have any examples, I'd be interested to know. Feel free to [post them in an issue](https://github.com/stuffmatic/zephyr-usb-midi/issues/new).
 
 ## Development notes
 
