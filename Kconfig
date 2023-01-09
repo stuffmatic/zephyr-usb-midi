@@ -1,9 +1,149 @@
 source "Kconfig.zephyr"
 
 config USB_MIDI_NUM_INPUTS
-  int "Number of USB MIDI inputs"
+  int "The number of jacks through which MIDI data flows into the device."
 	default 1
+  range 0 16
 
 config USB_MIDI_NUM_OUTPUTS
-  int "Number of USB MIDI outputs"
+  int "The number of jacks through which MIDI data flows out of the device."
 	default 1
+  range 0 16
+
+config USB_MIDI_USE_CUSTOM_JACK_NAMES
+  bool "Set to y to use custom input and output jack names defined by the options below."
+	default n
+
+#
+# Custom input jack names.
+#
+config USB_MIDI_INPUT_JACK_0_NAME
+  string "Custom string descriptor for input jack with cable number 0"
+	default "INPUT_JACK_0_NAME"
+
+config USB_MIDI_INPUT_JACK_1_NAME
+  string "Custom string descriptor for input jack with cable number 1"
+	default "INPUT_JACK_1_NAME"
+
+config USB_MIDI_INPUT_JACK_2_NAME
+  string "Custom string descriptor for input jack with cable number 2"
+	default "INPUT_JACK_2_NAME"
+
+config USB_MIDI_INPUT_JACK_3_NAME
+  string "Custom string descriptor for input jack with cable number 3"
+	default "INPUT_JACK_3_NAME"
+
+config USB_MIDI_INPUT_JACK_4_NAME
+  string "Custom string descriptor for input jack with cable number 4"
+	default "INPUT_JACK_4_NAME"
+
+config USB_MIDI_INPUT_JACK_5_NAME
+  string "Custom string descriptor for input jack with cable number 5"
+	default "INPUT_JACK_5_NAME"
+
+config USB_MIDI_INPUT_JACK_6_NAME
+  string "Custom string descriptor for input jack with cable number 6"
+	default "INPUT_JACK_6_NAME"
+
+config USB_MIDI_INPUT_JACK_7_NAME
+  string "Custom string descriptor for input jack with cable number 7"
+	default "INPUT_JACK_7_NAME"
+
+config USB_MIDI_INPUT_JACK_8_NAME
+  string "Custom string descriptor for input jack with cable number 8"
+	default "INPUT_JACK_8_NAME"
+
+config USB_MIDI_INPUT_JACK_9_NAME
+  string "Custom string descriptor for input jack with cable number 9"
+	default "INPUT_JACK_9_NAME"
+
+config USB_MIDI_INPUT_JACK_10_NAME
+  string "Custom string descriptor for input jack with cable number 10"
+	default "INPUT_JACK_10_NAME"
+
+config USB_MIDI_INPUT_JACK_11_NAME
+  string "Custom string descriptor for input jack with cable number 11"
+	default "INPUT_JACK_11_NAME"
+
+config USB_MIDI_INPUT_JACK_12_NAME
+  string "Custom string descriptor for input jack with cable number 12"
+	default "INPUT_JACK_12_NAME"
+
+config USB_MIDI_INPUT_JACK_13_NAME
+  string "Custom string descriptor for input jack with cable number 13"
+	default "INPUT_JACK_13_NAME"
+
+config USB_MIDI_INPUT_JACK_14_NAME
+  string "Custom string descriptor for input jack with cable number 14"
+	default "INPUT_JACK_14_NAME"
+
+config USB_MIDI_INPUT_JACK_15_NAME
+  string "Custom string descriptor for input jack with cable number 15"
+	default "INPUT_JACK_15_NAME"
+
+#
+# Custom input jack names
+#
+config USB_MIDI_OUTPUT_JACK_0_NAME
+  string "Custom string descriptor for output jack with cable number 0"
+	default "OUTPUT_JACK_0_NAME"
+
+config USB_MIDI_OUTPUT_JACK_1_NAME
+  string "Custom string descriptor for output jack with cable number 1"
+	default "OUTPUT_JACK_1_NAME"
+
+config USB_MIDI_OUTPUT_JACK_2_NAME
+  string "Custom string descriptor for output jack with cable number 2"
+	default "OUTPUT_JACK_2_NAME"
+
+config USB_MIDI_OUTPUT_JACK_3_NAME
+  string "Custom string descriptor for output jack with cable number 3"
+	default "OUTPUT_JACK_3_NAME"
+
+config USB_MIDI_OUTPUT_JACK_4_NAME
+  string "Custom string descriptor for output jack with cable number 4"
+	default "OUTPUT_JACK_4_NAME"
+
+config USB_MIDI_OUTPUT_JACK_5_NAME
+  string "Custom string descriptor for output jack with cable number 5"
+	default "OUTPUT_JACK_5_NAME"
+
+config USB_MIDI_OUTPUT_JACK_6_NAME
+  string "Custom string descriptor for output jack with cable number 6"
+	default "OUTPUT_JACK_6_NAME"
+
+config USB_MIDI_OUTPUT_JACK_7_NAME
+  string "Custom string descriptor for output jack with cable number 7"
+	default "OUTPUT_JACK_7_NAME"
+
+config USB_MIDI_OUTPUT_JACK_8_NAME
+  string "Custom string descriptor for output jack with cable number 8"
+	default "OUTPUT_JACK_8_NAME"
+
+config USB_MIDI_OUTPUT_JACK_9_NAME
+  string "Custom string descriptor for output jack with cable number 9"
+	default "OUTPUT_JACK_9_NAME"
+
+config USB_MIDI_OUTPUT_JACK_10_NAME
+  string "Custom string descriptor for output jack with cable number 10"
+	default "OUTPUT_JACK_10_NAME"
+
+config USB_MIDI_OUTPUT_JACK_11_NAME
+  string "Custom string descriptor for output jack with cable number 11"
+	default "OUTPUT_JACK_11_NAME"
+
+config USB_MIDI_OUTPUT_JACK_12_NAME
+  string "Custom string descriptor for output jack with cable number 12"
+	default "OUTPUT_JACK_12_NAME"
+
+config USB_MIDI_OUTPUT_JACK_13_NAME
+  string "Custom string descriptor for output jack with cable number 13"
+	default "OUTPUT_JACK_13_NAME"
+
+config USB_MIDI_OUTPUT_JACK_14_NAME
+  string "Custom string descriptor for output jack with cable number 14"
+	default "OUTPUT_JACK_14_NAME"
+
+config USB_MIDI_OUTPUT_JACK_15_NAME
+  string "Custom string descriptor for output jack with cable number 15"
+	default "OUTPUT_JACK_15_NAME"
