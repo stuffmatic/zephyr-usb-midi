@@ -325,12 +325,32 @@ static void packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t num_midi_bytes, 
 
 	uint8_t first_byte = midi_bytes[0];
 
-	// TODO: actually compute CIN
-	enum usb_midi_cin cin = (first_byte & 0xf0) >> 4;
-	packet->cin = cin;
+	// Compute CIN from midi bytes. TODO: this is not complete
+	uint8_t high_nibble = first_byte >> 4;
+	if ((high_nibble >= 0x8 && high_nibble <= 0xb) || high_nibble == 0xe) {
+		// Three byte channel Voice Message
+		// (Note off, Note on, Poly KeyPress, Control Change, PitchBend Change)
+		packet->cin = high_nibble;
+	} else if (high_nibble == 0xc || high_nibble == 0xd) {
+		// Two byte channel Voice Message (Program Change, Channel Pressure)
+		packet->cin = high_nibble;
+	} else if (high_nibble == 0xf) {
+		if (first_byte == 0xf0) {
+			// sysex start
+				packet->cin = USB_MIDI_CIN_SYSEX_START;
+		} else if (first_byte == 0xf1 || first_byte == 0xf3) {
+			// time code quarter frame / song select
+			packet->cin = USB_MIDI_CIN_SYSCOM_2BYTE;
+		} else if (first_byte == 0xf2) {
+			// song position pointer
+			packet->cin = USB_MIDI_CIN_SYSCOM_3BYTE;
+		} else {
+			// TODO
+		}
+ 	}
 
 	// Put cable number and CIN in packet byte 0
-	packet->bytes[0] = (cable_num << 4) | cin;
+	packet->bytes[0] = (cable_num << 4) | packet->cin;
 
 	// Fill packet bytes 1,2 and 3 with zero padded midi bytes.
 	for (int i = 0; i < 3; i++)
