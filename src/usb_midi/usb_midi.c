@@ -11,47 +11,55 @@ BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device 
 #ifdef CONFIG_USB_MIDI_USE_CUSTOM_JACK_NAMES
 
 #define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) (4 + jack_idx)
-#define INPUT_JACK_STRING_DESCR_IDX(jack_idx) (4)
+#define INPUT_JACK_STRING_DESCR_IDX(jack_idx) (4 + jack_idx + USB_MIDI_NUM_OUTPUTS)
 
 #define OUTPUT_JACK_STRING_DESCR_TYPE(jack_number, _) \
 struct output_jack_##jack_number##_string_descr_type { \
 	uint8_t bLength; \
 	uint8_t bDescriptorType; \
 	uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME)]; \
-} __packed;
+} __packed output_jack_##jack_number##_string_descr;
 
 #define INPUT_JACK_STRING_DESCR_TYPE(jack_number, _) \
 struct input_jack_##jack_number##_string_descr_type { \
 	uint8_t bLength; \
 	uint8_t bDescriptorType; \
 	uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME)]; \
-} __packed;
+} __packed input_jack_##jack_number##_string_descr;
 
 #define INPUT_JACK_STRING_DESCR(jack_number, _) \
-USBD_STRING_DESCR_USER_DEFINE(primary) \
-struct input_jack_##jack_number##_string_descr_type input_jack_##jack_number##_string_descr = { \
+.input_jack_##jack_number##_string_descr = { \
 	.bLength = USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME), \
 	.bDescriptorType = USB_DESC_STRING, \
 	.bString = CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME \
-};
+},
 
 #define OUTPUT_JACK_STRING_DESCR(jack_number, _) \
-USBD_STRING_DESCR_USER_DEFINE(primary) \
-struct output_jack_##jack_number##_string_descr_type output_jack_##jack_number##_string_descr = { \
+.output_jack_##jack_number##_string_descr = { \
 	.bLength = USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME), \
 	.bDescriptorType = USB_DESC_STRING, \
 	.bString = CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME \
-};
+},
 
-INPUT_JACK_STRING_DESCR_TYPE(0, _)
-INPUT_JACK_STRING_DESCR_TYPE(1, _)
-INPUT_JACK_STRING_DESCR(0, _)
-INPUT_JACK_STRING_DESCR(1, _)
+struct jack_string_descriptors {
+	LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR_TYPE, (;))
+	LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR_TYPE, (;))
+} _packed;
 
-// LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR_TYPE, ( ))
-LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR_TYPE, ( ))
+USBD_STRING_DESCR_USER_DEFINE(primary)
+struct jack_string_descriptors jack_string_desc = {
+	LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ( ))
+	LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ( ))
+};;
+
+// INPUT_JACK_STRING_DESCR_TYPE(0, _)
+// INPUT_JACK_STRING_DESCR_TYPE(1, _)
+// INPUT_JACK_STRING_DESCR(0, _)
+// INPUT_JACK_STRING_DESCR(1, _)
+
+
 // LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ( ))
-LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ( ))
+// LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ( ))
 #elif
 #define INPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
 #define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
@@ -488,7 +496,6 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 
 uint32_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byte_count)
 {
-	struct input_jack_0_string_descr_type x = input_jack_0_string_descr;
 	struct usb_midi_packet packet;
 	packet_from_midi_bytes(midi_bytes, midi_byte_count, cable_number, &packet);
 	// printk("tx ");

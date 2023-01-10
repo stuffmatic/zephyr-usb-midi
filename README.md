@@ -2,7 +2,7 @@
 
 This repo contains a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) along with a [small test app](src/main.c). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB using a widely supported standard protocol.
 
-The implementation in its current state should be usable but __is still work in progress__ and uses Zephyr's [soon to be deprecated](https://github.com/zephyrproject-rtos/zephyr/issues/42066) current USB device stack. The goal is to eventually move to the new stack and get the implementation in good enough shape to submit a PR to mainline Zephyr if there's interest. Any help to achieve this would be much appreciated, for example
+The implementation in its current state should be usable but __is still work in progress__ and uses Zephyr's current and [soon to be deprecated](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB device stack. The goal is to eventually move to the new stack and get the implementation in good enough shape to submit a PR to mainline Zephyr if there's interest. Any help to achieve this would be much appreciated, for example
 
 * testing on different boards
 * testing compatibility with different host operating systems
@@ -13,7 +13,7 @@ The implementation in its current state should be usable but __is still work in 
 
 The public API is defined in [usb_midi.h](src/usb_midi/usb_midi.h).
 
-To try out the code in your own app, grab the code in [`src/usb_midi`](src/usb_midi), make sure you declare the config vars from [`Kconfig`](Kconfig) and set `CONFIG_USB_DEVICE_STACK=y` in your `.conf` file. 
+To try out the code in your own app, grab the code in [`src/usb_midi`](src/usb_midi), make sure you declare the config vars from [`Kconfig`](Kconfig) and set `CONFIG_USB_DEVICE_STACK=y` in your `.conf` file.
 
 ## Configuration options
 
