@@ -3,6 +3,39 @@
 #include <zephyr/drivers/gpio.h>
 #include "usb_midi/usb_midi.h"
 
+/****** USB MIDI packet tests start ******/
+#include "usb_midi/usb_midi_packet.h"
+void reset_packet(struct usb_midi_packet *packet)
+{
+	packet->bytes[0] = 0;
+	packet->bytes[1] = 0;
+	packet->bytes[2] = 0;
+	packet->bytes[3] = 0;
+
+	packet->cin = 0;
+	packet->num_midi_bytes = 0;
+	packet->cable_num = 0;
+}
+
+static void test_usb_midi_packet()
+{
+	struct usb_midi_packet packet;
+	uint8_t cable_num = 7;
+
+	for (uint8_t high_nibble = 0x8; high_nibble < 0xf; high_nibble++)
+	{
+		uint8_t msg[3] = {
+			high_nibble << 4, 0x12, 0x23
+		};
+		reset_packet(&packet);
+		uint32_t parse_rc = usb_midi_packet_from_midi_bytes(msg, cable_num, &packet);
+		__ASSERT(parse_rc == 0, "Failed to parse MIDI message");
+		__ASSERT(packet.cin == high_nibble, "Unexpected USB MIDI packet CIN");
+		__ASSERT(packet.cable_num == cable_num, "Unexpected USB MIDI packet cable number");
+	}
+}
+/****** USB MIDI packet tests end ******/
+
 #define SLEEP_TIME_MS 300
 #define LED0_NODE DT_ALIAS(led0)
 #define LED1_NODE DT_ALIAS(led1)
@@ -26,6 +59,9 @@ void usb_midi_available(bool is_available)
 
 void main(void)
 {
+	/* Run tests (should not be done here obvs) */
+	test_usb_midi_packet();
+
 	/* Set up LEDs */
 	/* Turn on LED 0 when the device is online */
 	gpio_pin_configure_dt(&led0, GPIO_OUTPUT_ACTIVE);
