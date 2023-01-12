@@ -6,8 +6,7 @@
 * device .bMaxPacketSize0 8 as in the spec example gives [00:00:00.557,189] <wrn> usb_device: Failed to write endpoint buffer 0x80. and the device does not enumerate .bMaxPacketSize0 64 seems to work fine (macOS)
 *  <wrn> usb_device: Endpoint 0x01 already enabled, <wrn> usb_device: Endpoint 0x81 already enabled on reconnecting
 * https://github.com/kcuzner/midi-fader/blob/master/firmware/src/usb_midi.c
-* port naming: USB_MIDI_CUSTOM_JACK_NAMES, USB_MIDI_OUT_1_NAME, USB_MIDI_OUT_2_NAME ... etc
-* make CONFIG_USB_MIDI_INPUT_JACK_0_NAME depend on enable jack names var
+* rely on zephyr device stack to populate device descriptor?
 
 Inspiration:
 
@@ -24,3 +23,4 @@ Inspiration:
 * http://janaxelson.com/forum/index.php?topic=1862.0
 * https://github.com/hathach/tinyusb/blob/master/src/device/usbd.h
 * https://www.latke.net/asp_digital/?p=61
+
