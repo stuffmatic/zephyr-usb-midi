@@ -2,7 +2,7 @@
 
 This repo contains a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) along with a [small test app](src/main.c). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB using a widely supported standard protocol.
 
-The implementation in its current state should be usable but __is still work in progress__ and uses Zephyr's current and [soon to be deprecated](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB device stack. The goal is to eventually move to the new stack and get the implementation in good enough shape to submit a PR to mainline Zephyr if there's interest. Any help to achieve this would be much appreciated, for example
+The implementation in its current state should be usable but __is still work in progress__, not properly packaged and uses Zephyr's current and [soon to be deprecated](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB device stack. The goal is to eventually move to the new stack and get the implementation in good enough shape for real world use. Any help to achieve this would be much appreciated, for example
 
 * testing on different boards
 * testing compatibility with different host operating systems
