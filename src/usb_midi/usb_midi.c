@@ -54,7 +54,7 @@ USBD_STRING_DESCR_USER_DEFINE(primary)
 struct jack_string_descriptors jack_string_desc = {
     LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, ())
 	LISTIFY(USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, ())};
-#elif
+#else
 /* No jack string descriptors by default  */
 #define INPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
 #define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
