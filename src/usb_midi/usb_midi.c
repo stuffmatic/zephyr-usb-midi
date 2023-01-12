@@ -380,7 +380,7 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 
 uint32_t usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes)
 {
-	if (cable_number < USB_MIDI_NUM_OUTPUTS)
+	if (cable_number >= USB_MIDI_NUM_OUTPUTS)
 	{
 		return 0;
 	}
