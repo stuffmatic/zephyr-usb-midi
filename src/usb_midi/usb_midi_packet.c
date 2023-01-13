@@ -1,6 +1,6 @@
 #include "usb_midi_packet.h"
 
-void parse_channel_msg(struct usb_midi_packet *packet, uint8_t first_byte)
+bool channel_msg_cin(uint8_t first_byte, uint8_t* cin)
 {
 	uint8_t high_nibble = first_byte >> 4;
 
@@ -12,38 +12,38 @@ void parse_channel_msg(struct usb_midi_packet *packet, uint8_t first_byte)
 	case 0xb: /* Control Change */
 	case 0xe: /* PitchBend Change */
 		/* Three byte channel Voice Message */
-		packet->cin = high_nibble;
-		packet->num_midi_bytes = 3;
+		*cin = high_nibble;
 		break;
 	case 0xc: /* Program Change */
 	case 0xd: /* Channel Pressure */
 		/* Two byte channel Voice Message */
-		packet->cin = high_nibble;
-		packet->num_midi_bytes = 2;
+		*cin = high_nibble;
 		break;
+	default:
+		/* Invalid status byte */
+		return false;
 	}
+
+        /* Valid status byte */
+	return true;
 }
 
-void parse_non_sysex_system_msg(struct usb_midi_packet *packet, uint8_t first_byte)
+bool non_sysex_system_msg_cin(uint8_t first_byte, uint8_t* cin)
 {
-	/* System common or system real time? */
 	switch (first_byte)
 	{
 	case 0xf1: /* MIDI Time Code Quarter Frame */
 	case 0xf3: /* Song Select */
 		/* 2 byte System Common message */
-		packet->cin = USB_MIDI_CIN_SYSCOM_2BYTE;
-		packet->num_midi_bytes = 2;
-		break;
+		*cin = USB_MIDI_CIN_SYSCOM_2BYTE;
+                break;
 	case 0xf2: /* Song Position Pointer */
 		/* 3 byte System Common message */
-		packet->cin = USB_MIDI_CIN_SYSCOM_3BYTE;
-		packet->num_midi_bytes = 3;
-		break;
+		*cin = USB_MIDI_CIN_SYSCOM_3BYTE;
+                break;
 	case 0xf6: /* Tune request */
 		/* Single-byte System Common Message */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_1BYTE;
-		packet->num_midi_bytes = 1;
+		*cin = USB_MIDI_CIN_SYSEX_END_1BYTE;
 		break;
 	case 0xf8: /* Timing Clock */
 	case 0xfa: /* Start */
@@ -52,15 +52,18 @@ void parse_non_sysex_system_msg(struct usb_midi_packet *packet, uint8_t first_by
 	case 0xfe: /* Active Sensing */
 	case 0xff: /* System Reset */
 		/* 1 byte system real time */
-		packet->cin = USB_MIDI_CIN_1BYTE_DATA;
-		packet->num_midi_bytes = 1;
-		break;
+		*cin = USB_MIDI_CIN_1BYTE_DATA;
+    break;
 	default:
-		break;
+		/* Invalid status byte */
+		return false;
 	}
+
+        /* Valid status byte */
+	return true;
 }
 
-void parse_sysex_msg(struct usb_midi_packet *packet, uint8_t *midi_bytes)
+bool sysex_msg_cin(uint8_t* midi_bytes, uint8_t* cin)
 {
 	bool is_data_byte[3] = {
 			midi_bytes[0] < 0x80,
@@ -70,44 +73,66 @@ void parse_sysex_msg(struct usb_midi_packet *packet, uint8_t *midi_bytes)
 	if (midi_bytes[0] == 0xf0 && midi_bytes[1] == 0xf7)
 	{
 		/* Sysex case 1: F0 F7 */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
-		packet->num_midi_bytes = 2;
+		*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
 	}
 	else if (midi_bytes[0] == 0xf0 && is_data_byte[1] && midi_bytes[2] == 0xf7)
 	{
 		/* Sysex case 2: F0 d F7 */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
-		packet->num_midi_bytes = 3;
+		*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
 	}
 	else if (midi_bytes[0] == 0xf0 && is_data_byte[1] && is_data_byte[2])
 	{
 		/* Sysex case 3: F0 d d */
-		packet->cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
-		packet->num_midi_bytes = 3;
+		*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
 	}
 	else if (is_data_byte[0] && is_data_byte[1] && is_data_byte[2])
 	{
 		/* Sysex case 4: d d d */
-		packet->cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
-		packet->num_midi_bytes = 3;
+		*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
 	}
 	else if (is_data_byte[0] && is_data_byte[1] && midi_bytes[2] == 0xf7)
 	{
 		/* Sysex case 5: d d F7 */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
-		packet->num_midi_bytes = 3;
+		*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
 	}
 	else if (is_data_byte[0] && midi_bytes[1] == 0xf7)
 	{
 		/* Sysex case 6: d F7 */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
-		packet->num_midi_bytes = 2;
+		*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
 	}
 	else if (midi_bytes[0] == 0xf7)
 	{
 		/* Sysex case 7: F7 */
-		packet->cin = USB_MIDI_CIN_SYSEX_END_1BYTE;
-		packet->num_midi_bytes = 1;
+		*cin = USB_MIDI_CIN_SYSEX_END_1BYTE;
+	}
+	else
+	{
+		/* Invalid sysex sequence */
+		return false;
+	}
+
+        /* Valid sysex sequence */
+	return true;
+}
+
+uint8_t num_midi_bytes_for_cin(uint8_t cin)
+{
+	switch (cin)
+	{
+	case USB_MIDI_CIN_MISC:
+	case USB_MIDI_CIN_CABLE_EVENT:
+		/* Reserved for future expansion. Ignore. */
+		return 0;
+	case USB_MIDI_CIN_SYSEX_END_1BYTE:
+	case USB_MIDI_CIN_1BYTE_DATA:
+		return 1;
+	case USB_MIDI_CIN_SYSCOM_2BYTE:
+	case USB_MIDI_CIN_SYSEX_END_2BYTE:
+	case USB_MIDI_CIN_PROGRAM_CHANGE:
+	case USB_MIDI_CIN_CHANNEL_PRESSURE:
+		return 2;
+	default:
+		return 3;
 	}
 }
 
@@ -160,23 +185,24 @@ uint32_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
 	{
 		return EINVAL;
 	}
+
 	packet->cable_num = cable_num;
 	packet->cin = 0;
 	packet->num_midi_bytes = 0;
 
-	uint8_t first_byte = midi_bytes[0];
-
-	parse_channel_msg(packet, first_byte);
-	if (packet->num_midi_bytes == 0)
+	bool did_set_cin = channel_msg_cin(midi_bytes[0], &packet->cin);
+	if (!did_set_cin)
 	{
-		parse_non_sysex_system_msg(packet, first_byte);
+		did_set_cin = non_sysex_system_msg_cin(midi_bytes[0], &packet->cin);
 	}
-	if (packet->num_midi_bytes == 0)
+	if (!did_set_cin)
 	{
-		parse_sysex_msg(packet, midi_bytes);
+		did_set_cin = sysex_msg_cin(midi_bytes, &packet->cin);
 	}
 
-	if (packet->num_midi_bytes == 0)
+	packet->num_midi_bytes = num_midi_bytes_for_cin(packet->cin);
+
+        if (!did_set_cin || packet->num_midi_bytes == 0)
 	{
 		/* Invalid MIDI message. */
 		return EINVAL;
@@ -186,12 +212,15 @@ uint32_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
 	packet->bytes[0] = (packet->cable_num << 4) | packet->cin;
 
 	/* Fill packet bytes 1,2 and 3 with zero padded midi bytes. */
-	for (int i = 0; i < 3; i++)
+        packet->bytes[1] = 0;
+        packet->bytes[2] = 0;
+        packet->bytes[3] = 0;
+	for (int i = 0; i < packet->num_midi_bytes; i++)
 	{
-		uint8_t midi_byte = i < packet->num_midi_bytes ? midi_bytes[i] : 0;
-		packet->bytes[i + 1] = midi_byte;
+		packet->bytes[i + 1] = midi_bytes[i];
 	}
 
+        /* No errors */
 	return 0;
 }
 
@@ -210,34 +239,14 @@ uint32_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes, struct usb_midi_p
 
 	packet->cable_num = packet_bytes[0] >> 4;
 	packet->cin = packet_bytes[0] & 0xf;
-	packet->num_midi_bytes = 0;
-
-	switch (packet->cin)
-	{
-	case USB_MIDI_CIN_MISC:
-	case USB_MIDI_CIN_CABLE_EVENT:
-		/* Reserved for future expansion. Ignore. */
-		break;
-	case USB_MIDI_CIN_SYSEX_END_1BYTE:
-	case USB_MIDI_CIN_1BYTE_DATA:
-		packet->num_midi_bytes = 1;
-		break;
-	case USB_MIDI_CIN_SYSCOM_2BYTE:
-	case USB_MIDI_CIN_SYSEX_END_2BYTE:
-	case USB_MIDI_CIN_PROGRAM_CHANGE:
-	case USB_MIDI_CIN_CHANNEL_PRESSURE:
-		packet->num_midi_bytes = 2;
-		break;
-	default:
-		packet->num_midi_bytes = 3;
-		break;
-	}
+	packet->num_midi_bytes = num_midi_bytes_for_cin(packet->cin);
 
 	if (packet->num_midi_bytes == 0)
 	{
 		return EINVAL;
 	}
 
+        /* No errors */
 	return 0;
 
 	// LOG_DBG("Parsed packet cin %d, num_midi_bytes %d", packet->cin, packet->num_midi_bytes);
