@@ -73,42 +73,35 @@ static enum usb_midi_error_t sysex_msg_cin(uint8_t *midi_bytes, uint8_t *cin)
 		midi_bytes[1] < 0x80,
 		midi_bytes[2] < 0x80};
 
-	// TODO: nested if statements
-	/*
-	if (0 == f0)
+	if (midi_bytes[0] == SYSEX_START_BYTE)
 	{
-		if (1 == data)
+		if (midi_bytes[1] == SYSEX_END_BYTE) {
+			/* Sysex case 1: F0 F7 */
+			*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
+		} else if (is_data_byte[1]) {
+			if (midi_bytes[2] == SYSEX_END_BYTE) {
+				/* Sysex case 2: F0 d F7 */
+				*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
+			} else if (is_data_byte[2]) {
+				/* Sysex case 3: F0 d d */
+				*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
+			}
+		}
 	}
-	*/
-	if (midi_bytes[0] == SYSEX_START_BYTE && midi_bytes[1] == SYSEX_END_BYTE)
+	else if (is_data_byte[0])
 	{
-		/* Sysex case 1: F0 F7 */
-		*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
-	}
-	else if (midi_bytes[0] == SYSEX_START_BYTE && is_data_byte[1] && midi_bytes[2] == SYSEX_END_BYTE)
-	{
-		/* Sysex case 2: F0 d F7 */
-		*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
-	}
-	else if (midi_bytes[0] == SYSEX_START_BYTE && is_data_byte[1] && is_data_byte[2])
-	{
-		/* Sysex case 3: F0 d d */
-		*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
-	}
-	else if (is_data_byte[0] && is_data_byte[1] && is_data_byte[2])
-	{
-		/* Sysex case 4: d d d */
-		*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
-	}
-	else if (is_data_byte[0] && is_data_byte[1] && midi_bytes[2] == SYSEX_END_BYTE)
-	{
-		/* Sysex case 5: d d F7 */
-		*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
-	}
-	else if (is_data_byte[0] && midi_bytes[1] == SYSEX_END_BYTE)
-	{
-		/* Sysex case 6: d F7 */
-		*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
+		if (is_data_byte[1]) {
+			if (is_data_byte[2]) {
+				/* Sysex case 4: d d d */
+				*cin = USB_MIDI_CIN_SYSEX_START_OR_CONTINUE;
+			} else if (midi_bytes[2] == SYSEX_END_BYTE) {
+				/* Sysex case 5: d d F7 */
+				*cin = USB_MIDI_CIN_SYSEX_END_3BYTE;
+			}
+		} else if (midi_bytes[1] == SYSEX_END_BYTE) {
+			/* Sysex case 6: d F7 */
+			*cin = USB_MIDI_CIN_SYSEX_END_2BYTE;
+		}
 	}
 	else if (midi_bytes[0] == SYSEX_END_BYTE)
 	{
