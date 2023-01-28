@@ -279,23 +279,29 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 																					 ep_status)
 {
 	uint8_t buf[4];
-	uint32_t num_read_bytes = 0;
-	usb_read(ep, buf, 4, &num_read_bytes);
-	struct usb_midi_packet_t packet;
-	enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
-	log_packet(&packet);
-	if (error != USB_MIDI_SUCCESS)
+	uint32_t num_read_bytes = 1;
+	while (num_read_bytes > 0)
 	{
-		// WARN ignored message
-	}
-	else
-	{
-		struct usb_midi_parse_cb_t parse_cb = {
-				.message_cb = handlers.midi_message_cb,
-				.sysex_data_cb = handlers.sysex_data_cb,
-				.sysex_end_cb = handlers.sysex_end_cb,
-				.sysex_start_cb = handlers.sysex_start_cb};
-		error = usb_midi_parse_packet(packet.bytes, &parse_cb);
+		int read_rc = usb_read(ep, buf, 4, &num_read_bytes);
+		if (num_read_bytes == 0) {
+			break;
+		}
+		struct usb_midi_packet_t packet;
+		enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
+		// log_packet(&packet);
+		if (error != USB_MIDI_SUCCESS)
+		{
+			// WARN ignored message
+		}
+		else
+		{
+			struct usb_midi_parse_cb_t parse_cb = {
+					.message_cb = handlers.midi_message_cb,
+					.sysex_data_cb = handlers.sysex_data_cb,
+					.sysex_end_cb = handlers.sysex_end_cb,
+					.sysex_start_cb = handlers.sysex_start_cb};
+			error = usb_midi_parse_packet(packet.bytes, &parse_cb);
+		}
 	}
 }
 

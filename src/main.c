@@ -12,7 +12,7 @@ static bool usb_midi_is_available = false;
 
 static void log_buffer(const char* tag, uint8_t *bytes, uint8_t num_bytes)
 {
-	printk("%s", tag, num_bytes);
+	printk("%s ", tag, num_bytes);
 	for (int i = 0; i < num_bytes; i++) {
 			printk("%02x ", bytes[i]);
 	}
