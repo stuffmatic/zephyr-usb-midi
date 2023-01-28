@@ -7,6 +7,7 @@
 *  <wrn> usb_device: Endpoint 0x01 already enabled, <wrn> usb_device: Endpoint 0x81 already enabled on reconnecting
 * https://github.com/kcuzner/midi-fader/blob/master/firmware/src/usb_midi.c
 * rely on zephyr device stack to populate device descriptor?
+* validate no interleaved system realtime bytes
 
 Inspiration:
 

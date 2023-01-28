@@ -1,10 +1,17 @@
 #ifndef ZEPHYR_USB_MIDI_PACKET_H_
 #define ZEPHYR_USB_MIDI_PACKET_H_
 
-#include <zephyr/zephyr.h>
+#include <stdint.h>
+
+enum usb_midi_error_t {
+        USB_MIDI_SUCCESS = 0,
+        USB_MIDI_ERROR_INVALID_CIN = -1,
+        USB_MIDI_ERROR_INVALID_CABLE_NUM = -2,
+        USB_MIDI_ERROR_INVALID_MIDI_MSG = -3
+};
 
 /* Code Index Numbers. See table 4-1 in the spec. */
-enum usb_midi_cin
+enum usb_midi_cin_t
 {
         /* Miscellaneous function codes. Reserved for future extensions. */
         USB_MIDI_CIN_MISC = 0x0,
@@ -17,7 +24,7 @@ enum usb_midi_cin
         /* SysEx starts or continues */
         USB_MIDI_CIN_SYSEX_START_OR_CONTINUE = 0x4,
         /* Single-byte System Common Message or SysEx ends with following single byte. */
-        USB_MIDI_CIN_SYSEX_END_1BYTE = 0x5,
+        USB_MIDI_CIN_SYS_COMMON_OR_SYSEX_END_1BYTE = 0x5,
         /* SysEx ends with following two bytes. */
         USB_MIDI_CIN_SYSEX_END_2BYTE = 0x6,
         /* SysEx ends with following three bytes. */
@@ -40,8 +47,29 @@ enum usb_midi_cin
         USB_MIDI_CIN_1BYTE_DATA = 0xF
 };
 
+/** Called when a non-sysex message has been parsed */
+typedef void (*usb_midi_message_cb_t)(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num);
+/** Called when a sysex message starts */
+typedef void (*usb_midi_sysex_start_cb_t)(uint8_t cable_num);
+/** Called when sysex data bytes have been received */
+typedef void (*usb_midi_sysex_data_cb_t)(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t cable_num);
+/** Called when a sysex message ends */
+typedef void (*usb_midi_sysex_end_cb_t)(uint8_t cable_num);
+
+struct usb_midi_parse_cb_t {
+        usb_midi_message_cb_t message_cb;
+        usb_midi_sysex_start_cb_t sysex_start_cb;
+        usb_midi_sysex_data_cb_t sysex_data_cb;
+        usb_midi_sysex_end_cb_t sysex_end_cb;
+};
+
+/**
+ * Parses a USB MIDI packet and invokes the appropriate callback.
+ */
+enum usb_midi_error_t usb_midi_parse_packet(uint8_t* packet_bytes, struct usb_midi_parse_cb_t *parse_cb);
+
 /* A USB MIDI event packet. See chapter 4 in the spec. */
-struct usb_midi_packet
+struct usb_midi_packet_t
 {
         uint8_t cable_num;
         uint8_t cin;
@@ -49,8 +77,7 @@ struct usb_midi_packet
         uint8_t num_midi_bytes;
 };
 
-uint32_t usb_midi_packet_from_midi_bytes(uint8_t* midi_bytes, uint8_t cable_num, struct usb_midi_packet *packet);
-
-uint32_t usb_midi_packet_from_usb_bytes(uint8_t* packet_bytes, struct usb_midi_packet *packet);
+enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t* midi_bytes, uint8_t cable_num, struct usb_midi_packet_t *packet);
+enum usb_midi_error_t usb_midi_packet_from_usb_bytes(uint8_t* packet_bytes, struct usb_midi_packet_t *packet);
 
 #endif

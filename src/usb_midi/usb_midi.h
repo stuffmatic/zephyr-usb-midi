@@ -1,22 +1,28 @@
 #ifndef ZEPHYR_USB_MIDI_H_
 #define ZEPHYR_USB_MIDI_H_
 
-#include <zephyr/zephyr.h>
+#include <stdint.h>
+#include "usb_midi_packet.h"
 
 /** A function to call when MIDI data has been received. */
-typedef void (*usb_midi_rx_cb)(uint8_t cable_number, uint8_t* midi_bytes, uint8_t midi_byte_count);
+typedef void (*usb_midi_packet_cb_t)(struct usb_midi_packet);
 /** A function to call when the USB MIDI device becomes available/unavailable. */
-typedef void (*usb_midi_available_cb)(bool is_available);
+typedef void (*usb_midi_available_cb_t)(bool is_available);
 
-struct usb_midi_handlers {
-    usb_midi_rx_cb rx_cb;
-    usb_midi_available_cb available_cb;
+struct usb_midi_cb_t {
+    usb_midi_available_cb_t available_cb;
+    usb_midi_packet_cb_t packet_rx_cb;
+    usb_midi_packet_cb_t packet_tx_cb;
+    usb_midi_message_cb_t midi_message_cb;
+    usb_midi_sysex_start_cb_t sysex_start_cb;
+    usb_midi_sysex_data_cb_t sysex_data_cb;
+    usb_midi_sysex_end_cb_t sysex_end_cb;
 };
 
 /**
  * Register callbacks to invoke when receiving MIDI data etc.
  */
-void usb_midi_register_handlers(struct usb_midi_handlers* handlers);
+void usb_midi_register_handlers(struct usb_midi_cb_t* handlers);
 
 /**
  * Send a MIDI event with a given cable number. The event must be 1, 2 or 3 bytes long passed
@@ -38,6 +44,6 @@ void usb_midi_register_handlers(struct usb_midi_handlers* handlers);
  * Must be smaller than the number of outputs.
  * @param midi_bytes The MIDI bytes to send.
  */
-uint32_t usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
+int usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
 
 #endif

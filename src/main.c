@@ -3,39 +3,6 @@
 #include <zephyr/drivers/gpio.h>
 #include "usb_midi/usb_midi.h"
 
-/****** USB MIDI packet tests start ******/
-#include "usb_midi/usb_midi_packet.h"
-void reset_packet(struct usb_midi_packet *packet)
-{
-	packet->bytes[0] = 0;
-	packet->bytes[1] = 0;
-	packet->bytes[2] = 0;
-	packet->bytes[3] = 0;
-
-	packet->cin = 0;
-	packet->num_midi_bytes = 0;
-	packet->cable_num = 0;
-}
-
-static void test_usb_midi_packet()
-{
-	struct usb_midi_packet packet;
-	uint8_t cable_num = 7;
-
-	for (uint8_t high_nibble = 0x8; high_nibble < 0xf; high_nibble++)
-	{
-		uint8_t msg[3] = {
-			high_nibble << 4, 0x12, 0x23
-		};
-		reset_packet(&packet);
-		uint32_t parse_rc = usb_midi_packet_from_midi_bytes(msg, cable_num, &packet);
-		__ASSERT(parse_rc == 0, "Failed to parse MIDI message");
-		__ASSERT(packet.cin == high_nibble, "Unexpected USB MIDI packet CIN");
-		__ASSERT(packet.cable_num == cable_num, "Unexpected USB MIDI packet cable number");
-	}
-}
-/****** USB MIDI packet tests end ******/
-
 #define SLEEP_TIME_MS 300
 #define LED0_NODE DT_ALIAS(led0)
 #define LED1_NODE DT_ALIAS(led1)
@@ -43,10 +10,36 @@ static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
 static bool usb_midi_is_available = false;
 
-void usb_midi_rx(uint8_t cable_number, uint8_t *midi_bytes, uint8_t midi_byte_count)
+static void log_buffer(const char* tag, uint8_t *bytes, uint8_t num_bytes)
 {
+	printk("%s", tag, num_bytes);
+	for (int i = 0; i < num_bytes; i++) {
+			printk("%02x ", bytes[i]);
+	}
+	printk("\n");
+}
+
+static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num)
+{
+	log_buffer("midi msg", bytes, num_bytes);
 	gpio_pin_toggle_dt(&led1);
 }
+static void midi_sysex_start_cb(uint8_t cable_num)
+{
+	log_buffer("sysex start", NULL, 0);
+	gpio_pin_toggle_dt(&led1);
+}
+static void midi_sysex_data_cb(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
+{
+	log_buffer("sysex data", data_bytes, num_data_bytes);
+	gpio_pin_toggle_dt(&led1);
+}
+void midi_sysex_end_cb(uint8_t cable_num)
+{
+	log_buffer("sysex end", NULL, 0);
+	gpio_pin_toggle_dt(&led1);
+}
+
 
 void usb_midi_available(bool is_available)
 {
@@ -59,9 +52,6 @@ void usb_midi_available(bool is_available)
 
 void main(void)
 {
-	/* Run tests (should not be done here obvs) */
-	test_usb_midi_packet();
-
 	/* Set up LEDs */
 	/* Turn on LED 0 when the device is online */
 	gpio_pin_configure_dt(&led0, GPIO_OUTPUT_ACTIVE);
@@ -71,9 +61,13 @@ void main(void)
 	gpio_pin_set_dt(&led1, 0);
 
 	/* Register USB MIDI handlers */
-	struct usb_midi_handlers handlers = {
+	struct usb_midi_cb_t handlers = {
 	    .available_cb = usb_midi_available,
-	    .rx_cb = usb_midi_rx};
+	    .midi_message_cb = midi_message_cb,
+			.sysex_data_cb = midi_sysex_data_cb,
+			.sysex_end_cb = midi_sysex_end_cb,
+			.sysex_start_cb = midi_sysex_start_cb
+		};
 	usb_midi_register_handlers(&handlers);
 
 	/* Init USB */
