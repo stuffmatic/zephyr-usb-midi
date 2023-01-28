@@ -149,7 +149,19 @@ static void test_parse_non_sysex() {
         { 0xb1, 0x07, 0x08 }, // Control change
 	    { 0xc1, 0x09, 0x00 }, // Program change
 	    { 0xd1, 0xa, 0x00 }, // Channel aftertouch
-	    { 0xe1, 0x0b, 0x0c }  // Pitch bend change
+	    { 0xe1, 0x0b, 0x0c },  // Pitch bend change
+        /* System real time */
+        { 0xf8, 0, 0 }, /* Timing Clock */
+        { 0xfa, 0, 0 }, /* Start */
+        { 0xfb, 0, 0 }, /* Continue */
+        { 0xfc, 0, 0 }, /* Stop */
+        { 0xfe, 0, 0 }, /* Active Sensing */
+        { 0xff, 0, 0 }, /* System Reset */
+        /* System common */
+        { 0xf1, 0x1, 0 }, /* MIDI Time Code Quarter Frame */
+        { 0xf2, 0x2, 0x3 }, /* Song Position Pointer */
+        { 0xf3, 0x4, 0 }, /* Song Select */
+        { 0xf6, 0, 0 }, /* Tune request */
     };
     uint8_t num_messages = sizeof(messages) / 3;
     uint8_t cable_num = 13;
