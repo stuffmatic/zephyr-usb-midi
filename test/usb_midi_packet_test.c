@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include "../src/usb_midi/usb_midi_packet.h"
 
+int num_failed_assertions = 0;
+
 static void assert(int condition, const char* msg) {
     if (!condition) {
+        num_failed_assertions++;
         printf("❌ Assertion failed: %s\n", msg);
     }
 }
@@ -83,7 +86,8 @@ static void test_packet_from_midi_bytes()
     uint8_t invalid_message_count = sizeof(invalid_messages) / 3;
     for (int i = 0; i < invalid_message_count; i++) {
         enum usb_midi_error_t result = usb_midi_packet_from_midi_bytes(invalid_messages[i], cable_num, &packet);
-	    assert(result == USB_MIDI_ERROR_INVALID_MIDI_MSG, "Parsing valid channel message should succeed");
+	    assert(result == USB_MIDI_ERROR_INVALID_MIDI_MSG,
+               "Parsing invalid MIDI message should fail");
     }
 }
 
@@ -173,7 +177,8 @@ static void test_parse_non_sysex() {
         usb_midi_parse_packet(packet.bytes, &parse_cb);
         assert(error == USB_MIDI_SUCCESS, "usb_midi_packet_from_midi_bytes should not fail for valid non-sysex msg");
          for (int j = 0; j < packet.num_midi_bytes; j++) {
-            assert(parser_test_result.non_sysex_messages[0][j] == messages[i][j], "");
+            assert(parser_test_result.non_sysex_messages[0][j] == messages[i][j],
+                  "parsing valid non-sysex packets should not fail");
         }
     }
 }
@@ -200,7 +205,7 @@ static void test_parse_sysex() {
         assert(parser_test_result.num_non_sysex_messages == 0, "");
         assert(parser_test_result.sysex_write_pos == packet.num_midi_bytes, "");
         for (int j = 0; j < packet.num_midi_bytes; j++) {
-            assert(parser_test_result.sysex_messages[j] == sysex_messages[i][j], "");
+            assert(parser_test_result.sysex_messages[j] == sysex_messages[i][j], "parsing valid sysex packets should not not fail");
         }
     }
 }
@@ -210,4 +215,10 @@ int main(int argc, char *argv[])
     test_packet_from_midi_bytes();
     test_parse_sysex();
     test_parse_non_sysex();
+
+    if (num_failed_assertions > 0) {
+        printf("❌ %d failed assertions.\n", num_failed_assertions);
+    } else {
+        printf("✅ No failed assertions.\n");
+    }
 }
