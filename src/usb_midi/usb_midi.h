@@ -20,15 +20,14 @@ struct usb_midi_cb_t {
 };
 
 /**
- * Register callbacks to invoke when receiving MIDI data etc.
+ * Register callbacks to invoke when receiving MIDI messages etc.
  */
-void usb_midi_register_handlers(struct usb_midi_cb_t* handlers);
+void usb_midi_register_callbacks(struct usb_midi_cb_t* handlers);
 
 /**
- * Send a MIDI event with a given cable number. The event must be 1, 2 or 3 bytes long passed
+ * Send a MIDI message with a given cable number. The event must be 1, 2 or 3 bytes long passed
  * in a buffer of length 3 (unused bytes can be set to zero).
- * System real time messages must be sent as single byte events and must not be interleaved
- * in other events. All non-sysex events must start with a status byte (no running status).
+ * All non-sysex messages must start with a status byte (no running status).
  * Sysex sequences with more than three bytes must be split into smaller chunks by the caller.
  * The following sequences of sysex bytes are allowed, where d denotes a data byte.
  *

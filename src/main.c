@@ -1,98 +1,201 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
+#include <sys/ring_buffer.h>
 #include "usb_midi/usb_midi.h"
 
-#define SLEEP_TIME_MS 300
-#define LED0_NODE DT_ALIAS(led0)
-#define LED1_NODE DT_ALIAS(led1)
-static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-static bool usb_midi_is_available = false;
+/************************ App state ************************/
 
-static void log_buffer(const char* tag, uint8_t *bytes, uint8_t num_bytes)
+#define BUTTON_EVENT_RBUF_SIZE 128
+RING_BUF_DECLARE(button_event_rbuf, BUTTON_EVENT_RBUF_SIZE);
+
+#define SYSEX_TX_MESSAGE_SIZE 2000
+#define TX_NOTE_NUMBER 0x69
+#define TX_NOTE_VELOCITY 0x7f
+
+struct sample_app_state_t {
+	int usb_midi_is_available;
+	int sysex_rx_data_byte_count;
+	int sysex_tx_data_byte_count;
+	int sysex_tx_in_progress;
+	int button_states[4];
+};
+
+static struct sample_app_state_t sample_app_state = {
+	.usb_midi_is_available = 0,
+	.sysex_tx_data_byte_count = 0,
+	.sysex_tx_in_progress = 0,
+	.sysex_rx_data_byte_count = 0,
+	.button_states = {
+		0, 0, 0 ,0
+	}
+};
+
+/************************ LEDs ************************/
+
+#define LED_COUNT 3
+/* Turn on LED 0 when USB MIDI is available */
+#define LED_AVAILABLE 0
+/* Toggle LED 1 on received non-sysex messages */
+#define LED_RX_MSG 1
+/* Toggle LED 2 on received sysex messages */
+#define LED_RX_SYSEX 2
+
+static const struct gpio_dt_spec leds[LED_COUNT] = {
+	GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios)
+};
+
+static void init_leds() {
+	for (int i = 0; i < LED_COUNT; i++) {
+		gpio_pin_configure_dt(&leds[i], GPIO_OUTPUT_ACTIVE);
+		gpio_pin_set_dt(&leds[i], 0);
+	}
+}
+
+/************************ Buttons ************************/
+
+#define BUTTON_COUNT 4
+#define BUTTON_TX_MSG_0 0
+#define BUTTON_TX_MSG_1 1
+#define BUTTON_TX_MSG_2 2
+#define BUTTON_TX_SYSEX 3
+static const struct gpio_dt_spec buttons[BUTTON_COUNT] = {
+    GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw0), gpios, {0}),
+		GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw1), gpios, {0}),
+		GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw2), gpios, {0}),
+		GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw3), gpios, {0}),
+};
+static struct gpio_callback button_cb_data;
+
+static void button_pressed(const struct device *dev, struct gpio_callback *cb,
+                    uint32_t pins)
 {
-	printk("%s ", tag, num_bytes);
+    for (int i = 0; i < BUTTON_COUNT; i++) {
+        if ((pins & BIT(buttons[i].pin)) != 0) {
+					sample_app_state.button_states[i] = !sample_app_state.button_states[i];
+					int button_down = sample_app_state.button_states[i];
+					int button_event_code = i | (button_down << 2);
+					ring_buf_put(&button_event_rbuf, &button_event_code, 1);
+        }
+    }
+}
+
+static void init_buttons()
+{
+	for (int i = 0; i < BUTTON_COUNT; i++) {
+			__ASSERT_NO_MSG(device_is_ready(buttons[i].port));
+			int ret = gpio_pin_configure_dt(&buttons[i], GPIO_INPUT);
+			__ASSERT_NO_MSG(ret == 0);
+			ret = gpio_pin_interrupt_configure_dt(&buttons[i], GPIO_INT_EDGE_BOTH);
+			__ASSERT_NO_MSG(ret == 0);
+	}
+
+	gpio_init_callback(
+        &button_cb_data,
+        button_pressed,
+        BIT(buttons[0].pin) | BIT(buttons[1].pin) | BIT(buttons[2].pin) | BIT(buttons[3].pin));
+    int ret = gpio_add_callback(buttons[0].port, &button_cb_data);
+    __ASSERT_NO_MSG(ret == 0);
+}
+
+/****************** USB MIDI callbacks ******************/
+
+static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num)
+{
+	printk("rx non-sysex, cable %d: ", cable_num);
 	for (int i = 0; i < num_bytes; i++) {
 			printk("%02x ", bytes[i]);
 	}
 	printk("\n");
+	gpio_pin_toggle_dt(&leds[LED_RX_MSG]);
 }
 
-static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num)
+static void sysex_start_cb(uint8_t cable_num)
 {
-	log_buffer("midi msg", bytes, num_bytes);
-	gpio_pin_toggle_dt(&led1);
-}
-static void midi_sysex_start_cb(uint8_t cable_num)
-{
-	log_buffer("sysex start", NULL, 0);
-	gpio_pin_toggle_dt(&led1);
-}
-static void midi_sysex_data_cb(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
-{
-	log_buffer("sysex data", data_bytes, num_data_bytes);
-	gpio_pin_toggle_dt(&led1);
-}
-void midi_sysex_end_cb(uint8_t cable_num)
-{
-	log_buffer("sysex end", NULL, 0);
-	gpio_pin_toggle_dt(&led1);
+	sample_app_state.sysex_rx_data_byte_count = 0;
 }
 
-
-void usb_midi_available(bool is_available)
+static void sysex_data_cb(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
 {
-	usb_midi_is_available = is_available;
-	gpio_pin_set_dt(&led0, is_available);
+	sample_app_state.sysex_rx_data_byte_count += num_data_bytes;
+}
+
+static void sysex_end_cb(uint8_t cable_num)
+{
+	gpio_pin_toggle_dt(&leds[LED_RX_SYSEX]);
+	printk("rx sysex, cable %d: %d data bytes\n", cable_num, sample_app_state.sysex_rx_data_byte_count);
+}
+
+static void usb_midi_available(bool is_available)
+{
+	sample_app_state.usb_midi_is_available = is_available;
+	gpio_pin_set_dt(&leds[LED_AVAILABLE], is_available);
 	if (!is_available) {
-		gpio_pin_set_dt(&led1, 0);
+		gpio_pin_set_dt(&leds[LED_RX_MSG], 0);
+		gpio_pin_set_dt(&leds[LED_RX_SYSEX], 0);
+	}
+}
+
+/****************** Sample app ******************/
+
+void next_sysex_chunk(uint8_t* chunk) {
+	if (sample_app_state.sysex_tx_data_byte_count == 0) {
+		chunk[0] = 0xf0;
+		chunk[1] = 0x01;
+		chunk[2] = 0x02;
+	} else {
+		for (int i = 0; i < 3; i++) {
+			chunk[i] = sample_app_state.sysex_tx_data_byte_count;
+			sample_app_state.sysex_tx_data_byte_count++;
+		}
 	}
 }
 
 void main(void)
 {
-	/* Set up LEDs */
-	/* Turn on LED 0 when the device is online */
-	gpio_pin_configure_dt(&led0, GPIO_OUTPUT_ACTIVE);
-	gpio_pin_set_dt(&led0, 0);
-	/* Toggle LED 1 on oncoming MIDI events */
-	gpio_pin_configure_dt(&led1, GPIO_OUTPUT_ACTIVE);
-	gpio_pin_set_dt(&led1, 0);
+	init_leds();
+	init_buttons();
 
-	/* Register USB MIDI handlers */
-	struct usb_midi_cb_t handlers = {
+	/* Register USB MIDI callbacks */
+	struct usb_midi_cb_t callbacks = {
 	    .available_cb = usb_midi_available,
 	    .midi_message_cb = midi_message_cb,
-			.sysex_data_cb = midi_sysex_data_cb,
-			.sysex_end_cb = midi_sysex_end_cb,
-			.sysex_start_cb = midi_sysex_start_cb
+			.sysex_data_cb = sysex_data_cb,
+			.sysex_end_cb = sysex_end_cb,
+			.sysex_start_cb = sysex_start_cb
 		};
-	usb_midi_register_handlers(&handlers);
+	usb_midi_register_callbacks(&callbacks);
 
 	/* Init USB */
 	int enable_rc = usb_enable(NULL);
 	__ASSERT(enable_rc == 0, "Failed to enable USB");
 
-	/* Send note on/off repeatedly on all virutal cables */
-	bool is_note_on = false;
-	uint8_t cable_num = 0;
-	uint8_t note_num = 69;
-	uint8_t note_vel = 127;
-
 	while (1)
 	{
-		if (usb_midi_is_available)
-		{
-			/* Only send data if the device is available */
-			uint8_t midi_bytes[3] = {is_note_on ? 0x90 : 0x80, note_num, note_vel};
-			usb_midi_tx(cable_num, midi_bytes);
-			if (!is_note_on) {
-				/* Just sent note off. Move to the next virtual cable. */
-				cable_num = (cable_num + 1) % CONFIG_USB_MIDI_NUM_OUTPUTS;
+		/* Poll button events */
+		int button_event_code = 0;
+		while (ring_buf_get(&button_event_rbuf, &button_event_code, 1)) {
+			int button_idx = button_event_code & 0x3;
+			int button_down = button_event_code >> 2;
+			if (!sample_app_state.sysex_tx_in_progress) {
+				if (button_idx <= BUTTON_TX_MSG_2) {
+					uint8_t cable_num = button_idx;
+					uint8_t msg[3] = { button_down ? 0x90 : 0x80, TX_NOTE_NUMBER, TX_NOTE_VELOCITY };
+					usb_midi_tx(cable_num, msg);
+				}
+				else if (button_down) {
+					uint8_t cable_num = 0;
+					uint8_t msg[3] = { 0xf0, 0x11, 0xf7};
+					// TODO: send large sysex
+					usb_midi_tx(cable_num, msg);
+					// printk("tx failed after %d byte\n", sample_app_state.sysex_tx_data_byte_count);
+				}
 			}
-			is_note_on = !is_note_on;
 		}
-		k_msleep(SLEEP_TIME_MS);
+
+		/* Sleep for 1 ms */
+		k_msleep(1);
 	}
 }

@@ -264,7 +264,7 @@ static void log_packet(struct usb_midi_packet_t *packet)
 				 packet->cable_num, packet->cin, packet->num_midi_bytes);
 }
 
-void usb_midi_register_handlers(struct usb_midi_cb_t *cb)
+void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
 	handlers.available_cb = cb->available_cb;
 	handlers.midi_message_cb = cb->midi_message_cb;
@@ -394,19 +394,11 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 
 int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
-	if (cable_number >= USB_MIDI_NUM_OUTPUTS)
-	{
-		return USB_MIDI_ERROR_INVALID_CABLE_NUM;
-	}
-
 	struct usb_midi_packet_t packet;
 	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
-	// printk("tx ");
-	// log_packet(&packet);
-	// TODO: report error
 	if (error != USB_MIDI_SUCCESS)
 	{
-		return error;
+		return -EINVAL;
 	}
 	uint32_t num_written_bytes = 0;
 	usb_write(0x81, packet.bytes, 4, &num_written_bytes);

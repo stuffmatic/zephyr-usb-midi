@@ -1,14 +1,14 @@
 # zephyr-usb-midi
 
-This repo contains a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) along with a [small test app](src/main.c). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB using a widely supported standard protocol.
+This is a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB using a widely supported standard protocol.
 
-TODO: The code for parsing and serializing USB MIDI packets is completely self contained and does not have any external dependencies. This makes it both easy to test and use in other projects.
+To facilitate testing and reuse in other projects, the code for parsing, encoding and decoding USB MIDI packets is completely self contained and has no external dependencies. 
 
 ## Usage
 
 The public API is defined in [usb_midi.h](src/usb_midi/usb_midi.h).
 
-To try out the code in your own app, grab the code in [`src/usb_midi`](src/usb_midi), make sure you declare the config vars from [`Kconfig`](Kconfig) and set `CONFIG_USB_DEVICE_STACK=y` in your `.conf` file.
+TODO Check out demo app
 
 ## Configuration options
 
@@ -51,7 +51,11 @@ It is not entirely clear to me how the device topology (beyond the embedded jack
 
 Development work so far has been done on macOS using [nRF Connect SDK](https://www.nordicsemi.com/Products/Development-software/nRF-Connect-SDK) v2.1.2 and an [nRF52840 DK board](https://www.nordicsemi.com/Products/Development-hardware/nRF52840-DK).
 
-[MIDI Monitor](https://www.snoize.com/midimonitor/) and [MidiKeys](https://flit.github.io/projects/midikeys/) are open source macOS apps that have been useful during development.
+open source macOS apps have been useful during development:
+
+* [MIDI Monitor](https://www.snoize.com/midimonitor/)  
+* [MidiKeys](https://flit.github.io/projects/midikeys/)
+* [SysEx Librarian](https://www.snoize.com/sysexlibrarian/) 
 
 [USB in a nutshell](https://beyondlogic.org/usbnutshell/usb1.shtml)
 
