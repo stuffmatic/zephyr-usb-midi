@@ -4,15 +4,14 @@
 #include <stdint.h>
 #include "usb_midi_packet.h"
 
-/** A function to call when MIDI data has been received. */
-typedef void (*usb_midi_packet_cb_t)(struct usb_midi_packet);
+/** A function to call when a USB MIDI packet has just been sent. */
+typedef void (*usb_midi_tx_done_cb_t)();
 /** A function to call when the USB MIDI device becomes available/unavailable. */
 typedef void (*usb_midi_available_cb_t)(bool is_available);
 
 struct usb_midi_cb_t {
     usb_midi_available_cb_t available_cb;
-    usb_midi_packet_cb_t packet_rx_cb;
-    usb_midi_packet_cb_t packet_tx_cb;
+    usb_midi_tx_done_cb_t tx_done_cb;
     usb_midi_message_cb_t midi_message_cb;
     usb_midi_sysex_start_cb_t sysex_start_cb;
     usb_midi_sysex_data_cb_t sysex_data_cb;

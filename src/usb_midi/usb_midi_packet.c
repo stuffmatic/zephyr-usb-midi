@@ -161,7 +161,7 @@ enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8
 	 *    En - Pitch bend change, cin 0xe
 	 *
 	 * 2. is a non-sysex system message starting with one of the following
-	 *    status bytes followed by data bytes
+	 *    status bytes followed by zero or more data bytes
 	 *    (F4, F5, F9 and FD are undefined. F0, F7 are sysex)
 	 *
 	 *    F1 - MIDI Time Code Qtr. Frame, cin 0x2

@@ -1,4 +1,3 @@
-* zephyr unit tests
 * what device descr fields (etc) gets overridden by zephyr?
 * logging
 * connect/reconnect sometimes gives USB_DC_RESET

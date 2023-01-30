@@ -1,6 +1,8 @@
 # zephyr-usb-midi
 
-This is a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf). As the name suggests, this class lets a device running Zephyr send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB using a widely supported standard protocol.
+This is a [Zephyr](https://zephyrproject.org/) implementation of the [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf), which allows a device running Zephyr to send and receive [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB.
+
+Delivers full MIDI messages. No running status.
 
 To facilitate testing and reuse in other projects, the code for parsing, encoding and decoding USB MIDI packets is completely self contained and has no external dependencies. 
 
@@ -8,7 +10,23 @@ To facilitate testing and reuse in other projects, the code for parsing, encodin
 
 The public API is defined in [usb_midi.h](src/usb_midi/usb_midi.h).
 
-TODO Check out demo app
+## Sample application
+
+3 outputs, 2 inputs.
+
+### LEDs
+
+* __LED 1__ - Turns on when BLE MIDI is available.
+* __LED 2__ - Toggles on/off when receiving sysex messages.
+* __LED 3__ - Toggles on/off when receiving non-sysex messages with cable number 0.
+* __LED 4__- Toggles on/off when receiving non-sysex messages with cable number 1.
+
+### Buttons
+
+* __Button 1__ - Send note on/off on cable number 0.
+* __Button 2__ - Send note on/off on cable number 1.
+* __Button 3__ - Send note on/off on cable number 2.
+* __Button 4__ - Send a streaming sysex message on cable number 0.
 
 ## Configuration options
 

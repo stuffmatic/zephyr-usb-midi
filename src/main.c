@@ -1,13 +1,10 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
-#include <sys/ring_buffer.h>
 #include "usb_midi/usb_midi.h"
 
 /************************ App state ************************/
-
-#define BUTTON_EVENT_RBUF_SIZE 128
-RING_BUF_DECLARE(button_event_rbuf, BUTTON_EVENT_RBUF_SIZE);
+K_MSGQ_DEFINE(button_event_q, sizeof(uint8_t), 128, 4);
 
 #define SYSEX_TX_MESSAGE_SIZE 2000
 #define TX_NOTE_NUMBER 0x69
@@ -33,18 +30,21 @@ static struct sample_app_state_t sample_app_state = {
 
 /************************ LEDs ************************/
 
-#define LED_COUNT 3
+#define LED_COUNT 4
 /* Turn on LED 0 when USB MIDI is available */
 #define LED_AVAILABLE 0
-/* Toggle LED 1 on received non-sysex messages */
-#define LED_RX_MSG 1
-/* Toggle LED 2 on received sysex messages */
-#define LED_RX_SYSEX 2
+/* Toggle LED 1 on received sysex messages */
+#define LED_RX_SYSEX 1
+/* Toggle LED 2 when receiving non-sysex messages with cable number 0 */
+#define LED_RX_MSG_CN_0 2
+/* Toggle LED 3 when receiving non-sysex messages with cable number 1 */
+#define LED_RX_MSG_CN_1 3
 
 static const struct gpio_dt_spec leds[LED_COUNT] = {
 	GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios),
 	GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios),
-	GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios)
+	GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(led3), gpios)
 };
 
 static void init_leds() {
@@ -77,7 +77,7 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb,
 					sample_app_state.button_states[i] = !sample_app_state.button_states[i];
 					int button_down = sample_app_state.button_states[i];
 					int button_event_code = i | (button_down << 2);
-					ring_buf_put(&button_event_rbuf, &button_event_code, 1);
+					k_msgq_put(&button_event_q, &button_event_code, K_NO_WAIT);
         }
     }
 }
@@ -109,7 +109,7 @@ static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num
 			printk("%02x ", bytes[i]);
 	}
 	printk("\n");
-	gpio_pin_toggle_dt(&leds[LED_RX_MSG]);
+	gpio_pin_toggle_dt(&leds[cable_num == 0 ? LED_RX_MSG_CN_0 : LED_RX_MSG_CN_1]);
 }
 
 static void sysex_start_cb(uint8_t cable_num)
@@ -128,30 +128,40 @@ static void sysex_end_cb(uint8_t cable_num)
 	printk("rx sysex, cable %d: %d data bytes\n", cable_num, sample_app_state.sysex_rx_data_byte_count);
 }
 
-static void usb_midi_available(bool is_available)
+static void usb_midi_available_cb(bool is_available)
 {
 	sample_app_state.usb_midi_is_available = is_available;
 	gpio_pin_set_dt(&leds[LED_AVAILABLE], is_available);
 	if (!is_available) {
-		gpio_pin_set_dt(&leds[LED_RX_MSG], 0);
+		gpio_pin_set_dt(&leds[LED_RX_MSG_CN_0], 0);
+		gpio_pin_set_dt(&leds[LED_RX_MSG_CN_1], 0);
 		gpio_pin_set_dt(&leds[LED_RX_SYSEX], 0);
+	}
+}
+
+static void usb_midi_tx_done_cb()
+{
+	if (sample_app_state.sysex_tx_in_progress) {
+		uint8_t chunk[3] = {0, 0, 0};
+		for (int i = 0; i < 3; i++) {
+			if (sample_app_state.sysex_tx_data_byte_count == SYSEX_TX_MESSAGE_SIZE - 1) {
+				chunk[i] = 0xf7;
+			} else {
+				chunk[i] = sample_app_state.sysex_tx_data_byte_count % 128;
+			}
+			sample_app_state.sysex_tx_data_byte_count++;
+			if (sample_app_state.sysex_tx_data_byte_count == SYSEX_TX_MESSAGE_SIZE) {
+				sample_app_state.sysex_tx_in_progress = 0;
+				break;
+			}
+		}
+		// printk("sending sysex chunk %02x %02x %02x\n", chunk[0], chunk[1], chunk[2]);
+		usb_midi_tx(0, chunk);
 	}
 }
 
 /****************** Sample app ******************/
 
-void next_sysex_chunk(uint8_t* chunk) {
-	if (sample_app_state.sysex_tx_data_byte_count == 0) {
-		chunk[0] = 0xf0;
-		chunk[1] = 0x01;
-		chunk[2] = 0x02;
-	} else {
-		for (int i = 0; i < 3; i++) {
-			chunk[i] = sample_app_state.sysex_tx_data_byte_count;
-			sample_app_state.sysex_tx_data_byte_count++;
-		}
-	}
-}
 
 void main(void)
 {
@@ -160,7 +170,8 @@ void main(void)
 
 	/* Register USB MIDI callbacks */
 	struct usb_midi_cb_t callbacks = {
-	    .available_cb = usb_midi_available,
+	    .available_cb = usb_midi_available_cb,
+			.tx_done_cb = usb_midi_tx_done_cb,
 	    .midi_message_cb = midi_message_cb,
 			.sysex_data_cb = sysex_data_cb,
 			.sysex_end_cb = sysex_end_cb,
@@ -176,26 +187,26 @@ void main(void)
 	{
 		/* Poll button events */
 		int button_event_code = 0;
-		while (ring_buf_get(&button_event_rbuf, &button_event_code, 1)) {
-			int button_idx = button_event_code & 0x3;
-			int button_down = button_event_code >> 2;
-			if (!sample_app_state.sysex_tx_in_progress) {
-				if (button_idx <= BUTTON_TX_MSG_2) {
-					uint8_t cable_num = button_idx;
-					uint8_t msg[3] = { button_down ? 0x90 : 0x80, TX_NOTE_NUMBER, TX_NOTE_VELOCITY };
-					usb_midi_tx(cable_num, msg);
-				}
-				else if (button_down) {
-					uint8_t cable_num = 0;
-					uint8_t msg[3] = { 0xf0, 0x11, 0xf7};
-					// TODO: send large sysex
-					usb_midi_tx(cable_num, msg);
-					// printk("tx failed after %d byte\n", sample_app_state.sysex_tx_data_byte_count);
-				}
+		k_msgq_get(&button_event_q, &button_event_code, K_FOREVER);
+
+		int button_idx = button_event_code & 0x3;
+		int button_down = button_event_code >> 2;
+		if (!sample_app_state.sysex_tx_in_progress) {
+			if (button_idx <= BUTTON_TX_MSG_2) {
+				uint8_t cable_num = button_idx;
+				uint8_t msg[3] = { button_down ? 0x90 : 0x80, TX_NOTE_NUMBER, TX_NOTE_VELOCITY };
+				usb_midi_tx(cable_num, msg);
+			}
+			else if (button_down) {
+				/* Send the first chunk of sysex message that is too large
+					to be sent at once. Use the tx done callback to send the
+					next chunk repeatedly until done. */
+				uint8_t cable_num = 0;
+				uint8_t msg[3] = { 0xf0, 0x01, 0x02};
+				sample_app_state.sysex_tx_in_progress = 1;
+				sample_app_state.sysex_tx_data_byte_count = 3;
+				usb_midi_tx(cable_num, msg);
 			}
 		}
-
-		/* Sleep for 1 ms */
-		k_msleep(1);
 	}
 }

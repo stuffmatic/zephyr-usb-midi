@@ -248,11 +248,10 @@ struct usb_midi_config usb_midi_config_data = {
 		.out_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = USB_MIDI_NUM_INPUTS, .BaAssocJackID = {LISTIFY(USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + USB_MIDI_NUM_OUTPUTS)}}};
 
 static bool usb_midi_is_available = false;
-static struct usb_midi_cb_t handlers = {
+static struct usb_midi_cb_t user_callbacks = {
 		.available_cb = NULL,
 		.midi_message_cb = NULL,
-		.packet_rx_cb = NULL,
-		.packet_tx_cb = NULL,
+		.tx_done_cb = NULL,
 		.sysex_data_cb = NULL,
 		.sysex_end_cb = NULL,
 		.sysex_start_cb = NULL};
@@ -266,13 +265,12 @@ static void log_packet(struct usb_midi_packet_t *packet)
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
-	handlers.available_cb = cb->available_cb;
-	handlers.midi_message_cb = cb->midi_message_cb;
-	handlers.packet_rx_cb = cb->packet_rx_cb;
-	handlers.packet_tx_cb = cb->packet_tx_cb;
-	handlers.sysex_start_cb = cb->sysex_start_cb;
-	handlers.sysex_data_cb = cb->sysex_data_cb;
-	handlers.sysex_end_cb = cb->sysex_end_cb;
+	user_callbacks.available_cb = cb->available_cb;
+	user_callbacks.midi_message_cb = cb->midi_message_cb;
+	user_callbacks.tx_done_cb = cb->tx_done_cb;
+	user_callbacks.sysex_start_cb = cb->sysex_start_cb;
+	user_callbacks.sysex_data_cb = cb->sysex_data_cb;
+	user_callbacks.sysex_end_cb = cb->sysex_end_cb;
 }
 
 static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
@@ -296,10 +294,10 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 		else
 		{
 			struct usb_midi_parse_cb_t parse_cb = {
-					.message_cb = handlers.midi_message_cb,
-					.sysex_data_cb = handlers.sysex_data_cb,
-					.sysex_end_cb = handlers.sysex_end_cb,
-					.sysex_start_cb = handlers.sysex_start_cb};
+					.message_cb = user_callbacks.midi_message_cb,
+					.sysex_data_cb = user_callbacks.sysex_data_cb,
+					.sysex_end_cb = user_callbacks.sysex_end_cb,
+					.sysex_start_cb = user_callbacks.sysex_start_cb};
 			error = usb_midi_parse_packet(packet.bytes, &parse_cb);
 		}
 	}
@@ -308,6 +306,9 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 static void midi_in_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 																					ep_status)
 {
+	if (ep_status == USB_DC_EP_DATA_IN && user_callbacks.tx_done_cb) {
+		user_callbacks.tx_done_cb();
+	}
 	// LOG_DBG("midi_out_cb ep %d, ep_status %d\n", ep, ep_status);
 	/* if (usb_write(ep, loopback_buf, CONFIG_LOOPBACK_BULK_EP_MPS,
 			NULL)) {
@@ -345,9 +346,9 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		break;
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
-		if (!usb_midi_is_available && handlers.available_cb)
+		if (!usb_midi_is_available && user_callbacks.available_cb)
 		{
-			handlers.available_cb(true);
+			user_callbacks.available_cb(true);
 		}
 		usb_midi_is_available = true;
 		// printk("USB_DC_CONFIGURED\n");
@@ -358,9 +359,9 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		break;
 	/** USB connection suspended by the HOST */
 	case USB_DC_SUSPEND:
-		if (usb_midi_is_available && handlers.available_cb)
+		if (usb_midi_is_available && user_callbacks.available_cb)
 		{
-			handlers.available_cb(false);
+			user_callbacks.available_cb(false);
 		}
 		usb_midi_is_available = false;
 		// printk("USB_DC_SUSPEND\n");
