@@ -2,9 +2,9 @@
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
 #include <zephyr/logging/log.h>
-#include "usb_midi.h"
+#include <usb_midi/usb_midi.h>
+#include <usb_midi/usb_midi_packet.h>
 #include "usb_midi_internal.h"
-#include "usb_midi_packet.h"
 
 /* Require at least one jack */
 BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 jacks");
