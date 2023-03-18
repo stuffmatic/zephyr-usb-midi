@@ -167,8 +167,8 @@ struct usb_midi_element_descriptor
    physical jacks. */
 struct usb_midi_config
 {
-        struct usb_device_descriptor dev;
-        struct usb_cfg_descriptor cfg;
+        // struct usb_device_descriptor dev;
+        // struct usb_cfg_descriptor cfg;
         struct usb_if_descriptor ac_if;
         struct usb_midi_ac_if_descriptor ac_cs_if;
         struct usb_if_descriptor ms_if;

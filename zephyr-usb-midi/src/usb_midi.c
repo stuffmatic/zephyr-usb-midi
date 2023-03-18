@@ -228,12 +228,12 @@ struct jack_string_descriptors jack_string_desc = {
 			MIDI_MS_IF_DESC_TOTAL_SIZE)
 
 /* Descriptor size sanity check */
-BUILD_ASSERT(sizeof(struct usb_midi_config) == (CFG_TOTAL_LENGTH + sizeof(struct usb_device_descriptor)), "");
+// BUILD_ASSERT(sizeof(struct usb_midi_config) == (CFG_TOTAL_LENGTH + sizeof(struct usb_device_descriptor)), "");
 
-USBD_DEVICE_DESCR_DEFINE(primary) // TODO: why primary?
+USBD_CLASS_DESCR_DEFINE(primary, 0) // TODO: why primary?
 struct usb_midi_config usb_midi_config_data = {
-		.dev = INIT_DEVICE_DESC,
-		.cfg = INIT_CFG_DESC(CFG_TOTAL_LENGTH),
+		// .dev = INIT_DEVICE_DESC,
+		// .cfg = INIT_CFG_DESC(CFG_TOTAL_LENGTH),
 		.ac_if = INIT_AC_IF,
 		.ac_cs_if = INIT_AC_CS_IF,
 		.ms_if = INIT_MS_IF,
@@ -334,15 +334,15 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	{
 	/** USB error reported by the controller */
 	case USB_DC_ERROR:
-		// printk("USB_DC_ERROR\n");
+		printk("USB_DC_ERROR\n");
 		break;
 	/** USB reset */
 	case USB_DC_RESET:
-		// printk("USB_DC_RESET\n");
+		printk("USB_DC_RESET\n");
 		break;
 	/** USB connection established, hardware enumeration is completed */
 	case USB_DC_CONNECTED:
-		// printk("USB_DC_CONNECTED\n");
+		printk("USB_DC_CONNECTED\n");
 		break;
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
@@ -351,11 +351,11 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 			user_callbacks.available_cb(true);
 		}
 		usb_midi_is_available = true;
-		// printk("USB_DC_CONFIGURED\n");
+		printk("USB_DC_CONFIGURED\n");
 		break;
 	/** USB connection lost */
 	case USB_DC_DISCONNECTED:
-		// printk("USB_DC_DISCONNECTED\n");
+		printk("USB_DC_DISCONNECTED\n");
 		break;
 	/** USB connection suspended by the HOST */
 	case USB_DC_SUSPEND:
@@ -364,31 +364,31 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 			user_callbacks.available_cb(false);
 		}
 		usb_midi_is_available = false;
-		// printk("USB_DC_SUSPEND\n");
+		printk("USB_DC_SUSPEND\n");
 		break;
 	/** USB connection resumed by the HOST */
 	case USB_DC_RESUME:
-		// printk("USB_DC_RESUME\n");
+		printk("USB_DC_RESUME\n");
 		break;
 	/** USB interface selected */
 	case USB_DC_INTERFACE:
-		// printk("USB_DC_INTERFACE\n");
+		printk("USB_DC_INTERFACE\n");
 		break;
 	/** Set Feature ENDPOINT_HALT received */
 	case USB_DC_SET_HALT:
-		// printk("USB_DC_SET_HALT\n");
+		printk("USB_DC_SET_HALT\n");
 		break;
 	/** Clear Feature ENDPOINT_HALT received */
 	case USB_DC_CLEAR_HALT:
-		// printk("USB_DC_CLEAR_HALT\n");
+		printk("USB_DC_CLEAR_HALT\n");
 		break;
 	/** Start of Frame received */
 	case USB_DC_SOF:
-		// printk("USB_DC_SOF\n");
+		printk("USB_DC_SOF\n");
 		break;
 	/** Initial USB connection status */
 	case USB_DC_UNKNOWN:
-		// printk("USB_DC_UNKNOWN\n");
+		printk("USB_DC_UNKNOWN\n");
 		break;
 	}
 }
@@ -407,7 +407,7 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 }
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {
-		.usb_device_description = &usb_midi_config_data,
+		.usb_device_description = NULL,
 		.interface_config = NULL,
 		.interface_descriptor = &usb_midi_config_data.ac_if,
 		.cb_usb_status = usb_status_callback,
