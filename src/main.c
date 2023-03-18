@@ -1,4 +1,5 @@
 #include <zephyr/init.h>
+#include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
 #include "usb_midi/usb_midi.h"
