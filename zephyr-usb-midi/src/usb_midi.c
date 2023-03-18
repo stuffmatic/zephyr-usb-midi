@@ -217,23 +217,8 @@ struct jack_string_descriptors jack_string_desc = {
 			sizeof(struct usb_ep_descriptor_padded) +                            \
 			sizeof(struct usb_midi_bulk_in_ep_descriptor))
 
-/* Value for the wTotalLength field of the Configuration Descriptor. */
-#define CFG_TOTAL_LENGTH                         \
-	(                                              \
-			sizeof(struct usb_cfg_descriptor) +        \
-			sizeof(struct usb_if_descriptor) +         \
-			sizeof(struct usb_midi_ac_if_descriptor) + \
-			sizeof(struct usb_if_descriptor) +         \
-			sizeof(struct usb_midi_ms_if_descriptor) + \
-			MIDI_MS_IF_DESC_TOTAL_SIZE)
-
-/* Descriptor size sanity check */
-// BUILD_ASSERT(sizeof(struct usb_midi_config) == (CFG_TOTAL_LENGTH + sizeof(struct usb_device_descriptor)), "");
-
 USBD_CLASS_DESCR_DEFINE(primary, 0) // TODO: why primary?
 struct usb_midi_config usb_midi_config_data = {
-		// .dev = INIT_DEVICE_DESC,
-		// .cfg = INIT_CFG_DESC(CFG_TOTAL_LENGTH),
 		.ac_if = INIT_AC_IF,
 		.ac_cs_if = INIT_AC_CS_IF,
 		.ms_if = INIT_MS_IF,
