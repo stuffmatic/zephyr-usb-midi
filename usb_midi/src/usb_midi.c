@@ -142,36 +142,6 @@ struct jack_string_descriptors jack_string_desc = {
 		.bSynchAddress = 0x00,                              \
 	}
 
-#define INIT_DEVICE_DESC                               \
-	{                                                    \
-		.bLength = sizeof(struct usb_device_descriptor),   \
-		.bDescriptorType = USB_DESC_DEVICE,                \
-		.bcdUSB = 0x0110,                                  \
-		.bDeviceClass = 0x00,                              \
-		.bDeviceSubClass = 0x00,                           \
-		.bDeviceProtocol = 0x00,                           \
-		.bMaxPacketSize0 = 64,		/* 0x08 */               \
-				.idVendor = 0x2FE3,		/* TODO: set properly */ \
-				.idProduct = 0x1,			/* TODO: set properly */ \
-				.bcdDevice = 0x0,			/* TODO: set properly */ \
-				.iManufacturer = 0x1, /* TODO: set properly */ \
-				.iProduct = 0x2,			/* TODO: set properly */ \
-				.iSerialNumber = 0x0, /* TODO: set properly */ \
-				.bNumConfigurations = 0x1                      \
-	}
-
-#define INIT_CFG_DESC(total_length)                 \
-	{                                                 \
-		.bLength = sizeof(struct usb_cfg_descriptor),   \
-		.bDescriptorType = USB_DESC_CONFIGURATION,      \
-		.wTotalLength = total_length,                   \
-		.bNumInterfaces = 0x02,                         \
-		.bConfigurationValue = 0x01,                    \
-		.iConfiguration = 0x00,                         \
-		.bmAttributes = 0x80,	 /* TODO: set properly */ \
-				.bMaxPower = 0x32, /* TODO: set properly */ \
-	}
-
 #define INIT_AC_IF                                       \
 	{                                                      \
 		.bLength = sizeof(struct usb_if_descriptor),         \
@@ -271,7 +241,7 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 		}
 		struct usb_midi_packet_t packet;
 		enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
-		// log_packet(&packet);
+		log_packet(&packet);
 		if (error != USB_MIDI_SUCCESS)
 		{
 			// WARN ignored message

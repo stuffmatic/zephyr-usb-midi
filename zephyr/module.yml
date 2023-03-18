@@ -2,5 +2,5 @@
 # Copyright (c) 2019 Nordic Semiconductor
 
 build:
-  cmake: zephyr-usb-midi
-  kconfig: zephyr-usb-midi/Kconfig
+  cmake: usb_midi
+  kconfig: usb_midi/Kconfig
