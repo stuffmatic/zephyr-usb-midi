@@ -8,6 +8,12 @@
 * rely on zephyr device stack to populate device descriptor?
 * validate no interleaved system realtime bytes
 
+Module
+
+* logging config
+* rename to usb_midi?
+* select instead of depends on for kconfig vars?
+
 Inspiration:
 
 * https://conductivelabs.com/forum/showthread.php?tid=1227
