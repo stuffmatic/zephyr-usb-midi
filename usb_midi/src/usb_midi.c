@@ -8,6 +8,10 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 
+#define LOG_DBG_PACKET(packet) LOG_DBG("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
+				 packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3], \
+				 packet.cable_num, packet.cin, packet.num_midi_bytes)
+
 /* Require at least one jack */
 BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 jacks");
 
@@ -80,19 +84,19 @@ struct jack_string_descriptors jack_string_desc = {
 		.bInterfaceNumber = 0x01,                            \
 		.bAlternateSetting = 0x00,                           \
 		.bNumEndpoints = 2,                                  \
-		.bInterfaceClass = 0x01,				/* TODO: Constant */ \
-				.bInterfaceSubClass = 0x03, /* TODO: Constant */ \
+		.bInterfaceClass = USB_MIDI_AUDIO_INTERFACE_CLASS, \
+				.bInterfaceSubClass = USB_MIDI_MIDISTREAMING_INTERFACE_SUBCLASS, \
 				.bInterfaceProtocol = 0x00,                      \
 		.iInterface = 0x00                                   \
 	}
 
-#define INIT_MS_CS_IF(total_length)                      \
+#define INIT_MS_CS_IF                      \
 	{                                                      \
 		.bLength = sizeof(struct usb_midi_ms_if_descriptor), \
 		.bDescriptorType = USB_DESC_CS_INTERFACE,            \
 		.bDescriptorSubtype = 0x01,                          \
 		.BcdADC = 0x0100,                                    \
-		.wTotalLength = total_length                         \
+		.wTotalLength = MIDI_MS_IF_DESC_TOTAL_SIZE                         \
 	}
 
 #define INIT_IN_JACK(idx, idx_offset)                      \
@@ -151,8 +155,8 @@ struct jack_string_descriptors jack_string_desc = {
 		.bInterfaceNumber = 0,                               \
 		.bAlternateSetting = 0,                              \
 		.bNumEndpoints = 0,                                  \
-		.bInterfaceClass = 0x01,				/* TODO: Constant */ \
-				.bInterfaceSubClass = 0x01, /* TODO: Constant */ \
+		.bInterfaceClass = USB_MIDI_AUDIO_INTERFACE_CLASS, \
+				.bInterfaceSubClass = USB_MIDI_AUDIOCONTROL_INTERFACE_SUBCLASS, \
 				.bInterfaceProtocol = 0x00,                      \
 		.iInterface = 0x00                                   \
 	}
@@ -189,12 +193,12 @@ struct jack_string_descriptors jack_string_desc = {
 			sizeof(struct usb_ep_descriptor_padded) +                            \
 			sizeof(struct usb_midi_bulk_in_ep_descriptor))
 
-USBD_CLASS_DESCR_DEFINE(primary, 0) // TODO: why primary?
+USBD_CLASS_DESCR_DEFINE(primary, 0)
 struct usb_midi_config usb_midi_config_data = {
 		.ac_if = INIT_AC_IF,
 		.ac_cs_if = INIT_AC_CS_IF,
 		.ms_if = INIT_MS_IF,
-		.ms_cs_if = INIT_MS_CS_IF(MIDI_MS_IF_DESC_TOTAL_SIZE),
+		.ms_cs_if = INIT_MS_CS_IF,
 		.out_jacks_emb = {
 				LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_OUT_JACK, (, ), 0)},
 		.in_jacks_emb = {LISTIFY(USB_MIDI_NUM_INPUTS, INIT_IN_JACK, (, ), USB_MIDI_NUM_OUTPUTS)},
@@ -212,10 +216,6 @@ static struct usb_midi_cb_t user_callbacks = {
 		.sysex_data_cb = NULL,
 		.sysex_end_cb = NULL,
 		.sysex_start_cb = NULL};
-
-#define LOG_DBG_PACKET(packet) LOG_DBG("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
-				 packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3], \
-				 packet.cable_num, packet.cin, packet.num_midi_bytes)
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
@@ -302,7 +302,7 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		LOG_DBG("USB_DC_CONFIGURED");
 		if (!usb_midi_is_available && user_callbacks.available_cb)
 		{
-			LOG_INFO("USB MIDI device is available");
+			LOG_INF("USB MIDI device is available");
 			user_callbacks.available_cb(true);
 		}
 		usb_midi_is_available = true;
@@ -316,7 +316,7 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		LOG_DBG("USB_DC_SUSPEND");
 		if (usb_midi_is_available && user_callbacks.available_cb)
 		{
-			LOG_INFO("USB MIDI device is unavailable");
+			LOG_INF("USB MIDI device is unavailable");
 			user_callbacks.available_cb(false);
 		}
 		usb_midi_is_available = false;

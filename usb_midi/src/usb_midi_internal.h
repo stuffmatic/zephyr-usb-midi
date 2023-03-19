@@ -34,6 +34,10 @@ enum usb_midi_jack_type
         USB_MIDI_JACK_TYPE_EXTERNAL = 0x02
 };
 
+#define USB_MIDI_AUDIO_INTERFACE_CLASS 0x01
+#define USB_MIDI_MIDISTREAMING_INTERFACE_SUBCLASS 0x03
+#define USB_MIDI_AUDIOCONTROL_INTERFACE_SUBCLASS 0x01
+
 struct usb_midi_input_pin {
         uint8_t baSourceID;
         uint8_t baSourcePin;
