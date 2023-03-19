@@ -1,4 +1,11 @@
-source "Kconfig.zephyr"
+# Copyright (c) 2019 Nordic Semiconductor
+# SPDX-License-Identifier: Apache-2.0
+
+config USB_DEVICE_MIDI
+	bool "USB MIDI device class driver"
+	depends on USB_DEVICE_STACK
+
+if USB_DEVICE_MIDI
 
 config USB_MIDI_NUM_INPUTS
   int "The number of jacks through which MIDI data flows into the device."
@@ -147,3 +154,9 @@ config USB_MIDI_OUTPUT_JACK_14_NAME
 config USB_MIDI_OUTPUT_JACK_15_NAME
   string "Custom string descriptor for output jack with cable number 15"
 	default "OUTPUT_JACK_15_NAME"
+
+  module = USB_MIDI
+  module-str = USB MIDI
+  source "subsys/logging/Kconfig.template.log_config"
+
+endif #USB_DEVICE_MIDI

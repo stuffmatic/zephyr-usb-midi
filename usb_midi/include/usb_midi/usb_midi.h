@@ -2,7 +2,7 @@
 #define ZEPHYR_USB_MIDI_H_
 
 #include <stdint.h>
-#include "usb_midi_packet.h"
+#include <usb_midi/usb_midi_packet.h>
 
 /** A function to call when a USB MIDI packet has just been sent. */
 typedef void (*usb_midi_tx_done_cb_t)();
