@@ -1,10 +1,12 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
-#include <zephyr/logging/log.h>
 #include <usb_midi/usb_midi.h>
 #include <usb_midi/usb_midi_packet.h>
 #include "usb_midi_internal.h"
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 
 /* Require at least one jack */
 BUILD_ASSERT((USB_MIDI_NUM_INPUTS + USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 jacks");
@@ -211,12 +213,9 @@ static struct usb_midi_cb_t user_callbacks = {
 		.sysex_end_cb = NULL,
 		.sysex_start_cb = NULL};
 
-static void log_packet(struct usb_midi_packet_t *packet)
-{
-	printk("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes\n",
-				 packet->bytes[0], packet->bytes[1], packet->bytes[2], packet->bytes[3],
-				 packet->cable_num, packet->cin, packet->num_midi_bytes);
-}
+#define LOG_DBG_PACKET(packet) LOG_DBG("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
+				 packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3], \
+				 packet.cable_num, packet.cin, packet.num_midi_bytes)
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
@@ -241,19 +240,23 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 		}
 		struct usb_midi_packet_t packet;
 		enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
-		log_packet(&packet);
+		
 		if (error != USB_MIDI_SUCCESS)
 		{
-			// WARN ignored message
+			LOG_WRN("Packet parsing failed with error %d", error);
 		}
 		else
 		{
+			LOG_DBG_PACKET(packet);
 			struct usb_midi_parse_cb_t parse_cb = {
 					.message_cb = user_callbacks.midi_message_cb,
 					.sysex_data_cb = user_callbacks.sysex_data_cb,
 					.sysex_end_cb = user_callbacks.sysex_end_cb,
 					.sysex_start_cb = user_callbacks.sysex_start_cb};
 			error = usb_midi_parse_packet(packet.bytes, &parse_cb);
+			if (error != USB_MIDI_SUCCESS) {
+				LOG_ERR("Failed to parse packet");
+			}
 		}
 	}
 }
@@ -264,11 +267,6 @@ static void midi_in_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
 	if (ep_status == USB_DC_EP_DATA_IN && user_callbacks.tx_done_cb) {
 		user_callbacks.tx_done_cb();
 	}
-	// LOG_DBG("midi_out_cb ep %d, ep_status %d\n", ep, ep_status);
-	/* if (usb_write(ep, loopback_buf, CONFIG_LOOPBACK_BULK_EP_MPS,
-			NULL)) {
-		LOG_DBG("ep 0x%x", ep);
-	} */
 }
 
 static struct usb_ep_cfg_data midi_ep_cfg[] = {
@@ -289,61 +287,63 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	{
 	/** USB error reported by the controller */
 	case USB_DC_ERROR:
-		printk("USB_DC_ERROR\n");
+		LOG_DBG("USB_DC_ERROR");
 		break;
 	/** USB reset */
 	case USB_DC_RESET:
-		printk("USB_DC_RESET\n");
+		LOG_DBG("USB_DC_RESET");
 		break;
 	/** USB connection established, hardware enumeration is completed */
 	case USB_DC_CONNECTED:
-		printk("USB_DC_CONNECTED\n");
+		LOG_DBG("USB_DC_CONNECTED");
 		break;
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
+		LOG_DBG("USB_DC_CONFIGURED");
 		if (!usb_midi_is_available && user_callbacks.available_cb)
 		{
+			LOG_INFO("USB MIDI device is available");
 			user_callbacks.available_cb(true);
 		}
 		usb_midi_is_available = true;
-		printk("USB_DC_CONFIGURED\n");
 		break;
 	/** USB connection lost */
 	case USB_DC_DISCONNECTED:
-		printk("USB_DC_DISCONNECTED\n");
+		LOG_DBG("USB_DC_DISCONNECTED");
 		break;
 	/** USB connection suspended by the HOST */
 	case USB_DC_SUSPEND:
+		LOG_DBG("USB_DC_SUSPEND");
 		if (usb_midi_is_available && user_callbacks.available_cb)
 		{
+			LOG_INFO("USB MIDI device is unavailable");
 			user_callbacks.available_cb(false);
 		}
 		usb_midi_is_available = false;
-		printk("USB_DC_SUSPEND\n");
 		break;
 	/** USB connection resumed by the HOST */
 	case USB_DC_RESUME:
-		printk("USB_DC_RESUME\n");
+		LOG_DBG("USB_DC_RESUME");
 		break;
 	/** USB interface selected */
 	case USB_DC_INTERFACE:
-		printk("USB_DC_INTERFACE\n");
+		LOG_DBG("USB_DC_INTERFACE");
 		break;
 	/** Set Feature ENDPOINT_HALT received */
 	case USB_DC_SET_HALT:
-		printk("USB_DC_SET_HALT\n");
+		LOG_DBG("USB_DC_SET_HALT");
 		break;
 	/** Clear Feature ENDPOINT_HALT received */
 	case USB_DC_CLEAR_HALT:
-		printk("USB_DC_CLEAR_HALT\n");
+		LOG_DBG("USB_DC_CLEAR_HALT");
 		break;
 	/** Start of Frame received */
 	case USB_DC_SOF:
-		printk("USB_DC_SOF\n");
+		LOG_DBG("USB_DC_SOF");
 		break;
 	/** Initial USB connection status */
 	case USB_DC_UNKNOWN:
-		printk("USB_DC_UNKNOWN\n");
+		LOG_DBG("USB_DC_UNKNOWN");
 		break;
 	}
 }
@@ -354,8 +354,10 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
 	if (error != USB_MIDI_SUCCESS)
 	{
+		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d", midi_bytes[0], midi_bytes[1], midi_bytes[2], error);
 		return -EINVAL;
 	}
+	LOG_DBG_PACKET(packet);
 	uint32_t num_written_bytes = 0;
 	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
 	return num_written_bytes;

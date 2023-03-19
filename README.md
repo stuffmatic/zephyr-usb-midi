@@ -8,6 +8,8 @@ To facilitate testing and reuse in other projects, the code for parsing, encodin
 
 ## Usage
 
+REFERENCE ZEPHYR MODULE. SEE SAMPLE APP CMakeLists.txt.
+
 The public API is defined in [usb_midi.h](src/usb_midi/usb_midi.h).
 
 ## Sample application

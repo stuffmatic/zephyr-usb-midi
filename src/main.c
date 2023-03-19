@@ -105,11 +105,11 @@ static void init_buttons()
 
 static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num)
 {
-	printk("rx non-sysex, cable %d: ", cable_num);
+	/*printk("rx non-sysex, cable %d: ", cable_num);
 	for (int i = 0; i < num_bytes; i++) {
 			printk("%02x ", bytes[i]);
 	}
-	printk("\n");
+	printk("\n"); */
 	gpio_pin_toggle_dt(&leds[cable_num == 0 ? LED_RX_MSG_CN_0 : LED_RX_MSG_CN_1]);
 }
 
@@ -126,7 +126,7 @@ static void sysex_data_cb(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t c
 static void sysex_end_cb(uint8_t cable_num)
 {
 	gpio_pin_toggle_dt(&leds[LED_RX_SYSEX]);
-	printk("rx sysex, cable %d: %d data bytes\n", cable_num, sample_app_state.sysex_rx_data_byte_count);
+	// printk("rx sysex, cable %d: %d data bytes\n", cable_num, sample_app_state.sysex_rx_data_byte_count);
 }
 
 static void usb_midi_available_cb(bool is_available)
