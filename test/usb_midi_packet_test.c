@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <usb_midi/usb_midi_packet.h>
+#include "../usb_midi/src/usb_midi_packet.h"
 
 int num_failed_assertions = 0;
 

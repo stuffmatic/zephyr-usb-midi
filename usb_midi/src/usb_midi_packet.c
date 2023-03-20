@@ -1,4 +1,4 @@
-#include <usb_midi/usb_midi_packet.h>
+#include "usb_midi_packet.h"
 
 #define SYSEX_START_BYTE 0xF0
 #define SYSEX_END_BYTE 0xF7

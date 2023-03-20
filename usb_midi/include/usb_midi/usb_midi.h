@@ -2,12 +2,19 @@
 #define ZEPHYR_USB_MIDI_H_
 
 #include <stdint.h>
-#include <usb_midi/usb_midi_packet.h>
 
+/** A function to call when the USB MIDI device becomes available/unavailable. */
+typedef void (*usb_midi_available_cb_t)(int is_available);
 /** A function to call when a USB MIDI packet has just been sent. */
 typedef void (*usb_midi_tx_done_cb_t)();
-/** A function to call when the USB MIDI device becomes available/unavailable. */
-typedef void (*usb_midi_available_cb_t)(bool is_available);
+/** A function to call when a non-sysex message has been parsed */
+typedef void (*usb_midi_message_cb_t)(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num);
+/** A function to call when a sysex message starts */
+typedef void (*usb_midi_sysex_start_cb_t)(uint8_t cable_num);
+/** A function to call when sysex data bytes have been received */
+typedef void (*usb_midi_sysex_data_cb_t)(uint8_t* data_bytes, uint8_t num_data_bytes, uint8_t cable_num);
+/** A function to call when a sysex message ends */
+typedef void (*usb_midi_sysex_end_cb_t)(uint8_t cable_num);
 
 struct usb_midi_cb_t {
     usb_midi_available_cb_t available_cb;

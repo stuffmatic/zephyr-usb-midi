@@ -2,8 +2,8 @@
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
 #include <usb_midi/usb_midi.h>
-#include <usb_midi/usb_midi_packet.h>
 #include "usb_midi_internal.h"
+#include "usb_midi_packet.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);

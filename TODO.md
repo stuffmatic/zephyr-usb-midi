@@ -5,5 +5,4 @@
 Module
 
 * select instead of depends on for kconfig vars?
-* packet should be internal
 * replace bool with int
