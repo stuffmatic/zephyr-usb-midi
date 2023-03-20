@@ -1,12 +1,23 @@
 # zephyr-usb-midi
 
-This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for [Zephyr](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB. The current implementation uses Zephyr's [soon-to-be legacy USB stack](https://github.com/zephyrproject-rtos/zephyr/issues/42066).
+This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for the [Zephyr RTOS](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data (including system exclusive messages) over USB. 
+
+The current implementation, which uses Zephyr's [soon-to-be legacy](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB stack, should be usable but needs more testing before it's ready for real world use. If you run into any issues, please consider [reporting them](https://github.com/stuffmatic/zephyr-usb-midi/issues/new) or [submitting a PR](https://github.com/stuffmatic/zephyr-usb-midi/compare).
 
 ## Usage
 
-The USB MIDI device class driver is contained in a Zephyr module. In addition to this module, this repo also contains a [sample app](src/main.c) showing how to send and receive MIDI data. The sample app adds the driver module in its [CMakeLists.txt](CMakeLists.txt) file.
+The USB MIDI device class driver is contained in a Zephyr module. The sample app's [CMakeLists.txt](CMakeLists.txt) file shows one way of adding the module to an app.
 
 The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
+
+## Sample app
+
+The [sample app](src/main.c) shows how to send and receive MIDI data. Note on/off messages are sent periodically when connected to a host. The app should work on dev boards with at least one button and at least three LEDs, for example [stm32f4_disco](https://docs.zephyrproject.org/latest/boards/arm/stm32f4_disco/doc/index.html) and [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html).
+
+* __Button 0__ - Press to send a sysex message.
+* __LED 0__ - On when the device is connected to a host
+* __LED 1__ - Flashes when MIDI data is received
+* __LED 2__ - Flashes when MIDI data is sent 
 
 ## Configuration options
 

@@ -208,7 +208,7 @@ struct usb_midi_config usb_midi_config_data = {
 		.out_ep = INIT_OUT_EP,
 		.out_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = USB_MIDI_NUM_INPUTS, .BaAssocJackID = {LISTIFY(USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + USB_MIDI_NUM_OUTPUTS)}}};
 
-static bool usb_midi_is_available = false;
+static int usb_midi_is_available = false;
 static struct usb_midi_cb_t user_callbacks = {
 		.available_cb = NULL,
 		.midi_message_cb = NULL,
