@@ -1,13 +1,8 @@
-#ifndef ZEPHYR_USB_MIDI_INTERNAL_H_
-#define ZEPHYR_USB_MIDI_INTERNAL_H_
+#ifndef ZEPHYR_USB_MIDI_TYPES_H_
+#define ZEPHYR_USB_MIDI_TYPES_H_
 
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
-
-/* The number of MIDI input ports */
-#define USB_MIDI_NUM_INPUTS CONFIG_USB_MIDI_NUM_INPUTS
-/* The number of MIDI output ports */
-#define USB_MIDI_NUM_OUTPUTS CONFIG_USB_MIDI_NUM_OUTPUTS
 
 /* MS (MIDI streaming) Class-Specific Interface Descriptor Subtypes. See table A.1 in the spec. */
 enum usb_midi_if_desc_subtype
@@ -110,7 +105,8 @@ struct usb_midi_out_jack_descriptor
         uint8_t iJack;
 } __packed;
 
-/* same as usb_ep_descriptor but with two additional fields */
+/* same as usb_ep_descriptor but with two additional fields. TODO: more info about this */
+
 struct usb_ep_descriptor_padded
 {
         uint8_t bLength;
@@ -131,7 +127,7 @@ struct usb_midi_bulk_out_ep_descriptor
         uint8_t bDescriptorType;
         uint8_t bDescriptorSubtype;
         uint8_t bNumEmbMIDIJack;
-        uint8_t BaAssocJackID[USB_MIDI_NUM_INPUTS];
+        uint8_t BaAssocJackID[CONFIG_USB_MIDI_NUM_INPUTS];
 } __packed;
 
 /* Class-Specific MS Bulk Data Endpoint Descriptor corresponding to a MIDI input.
@@ -142,10 +138,10 @@ struct usb_midi_bulk_in_ep_descriptor
         uint8_t bDescriptorType;
         uint8_t bDescriptorSubtype;
         uint8_t bNumEmbMIDIJack;
-        uint8_t BaAssocJackID[USB_MIDI_NUM_OUTPUTS];
+        uint8_t BaAssocJackID[CONFIG_USB_MIDI_NUM_OUTPUTS];
 } __packed;
 
-#define ELEMENT_CAPS_COUNT 1
+#define USB_MIDI_ELEMENT_CAPS_COUNT 1
 
 /* Element descriptor.
    See table 6-5 in the spec. */
@@ -157,12 +153,12 @@ struct usb_midi_element_descriptor
          uint8_t bElementID;
          uint8_t bNrInputPins;
 
-        struct usb_midi_input_pin input_pins[USB_MIDI_NUM_INPUTS];
+        struct usb_midi_input_pin input_pins[CONFIG_USB_MIDI_NUM_INPUTS];
          uint8_t bNrOutputPins;
          uint8_t bInTerminalLink;
          uint8_t bOutTerminalLink;
          uint8_t bElCapsSize;
-        uint8_t bmElementCaps[ELEMENT_CAPS_COUNT];
+        uint8_t bmElementCaps[USB_MIDI_ELEMENT_CAPS_COUNT];
          uint8_t iElement;
 } __packed;
 
@@ -171,14 +167,12 @@ struct usb_midi_element_descriptor
    physical jacks. */
 struct usb_midi_config
 {
-        // struct usb_device_descriptor dev;
-        // struct usb_cfg_descriptor cfg;
         struct usb_if_descriptor ac_if;
         struct usb_midi_ac_if_descriptor ac_cs_if;
         struct usb_if_descriptor ms_if;
         struct usb_midi_ms_if_descriptor ms_cs_if;
-        struct usb_midi_in_jack_descriptor in_jacks_emb[USB_MIDI_NUM_INPUTS];
-        struct usb_midi_out_jack_descriptor out_jacks_emb[USB_MIDI_NUM_OUTPUTS];
+        struct usb_midi_in_jack_descriptor in_jacks_emb[CONFIG_USB_MIDI_NUM_INPUTS];
+        struct usb_midi_out_jack_descriptor out_jacks_emb[CONFIG_USB_MIDI_NUM_OUTPUTS];
         struct usb_midi_element_descriptor element;
         struct usb_ep_descriptor_padded out_ep;
         struct usb_midi_bulk_out_ep_descriptor out_cs_ep;
@@ -186,5 +180,6 @@ struct usb_midi_config
         struct usb_midi_bulk_in_ep_descriptor in_cs_ep;
 
 } __packed;
+
 
 #endif

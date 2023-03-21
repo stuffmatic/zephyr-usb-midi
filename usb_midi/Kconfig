@@ -155,8 +155,8 @@ config USB_MIDI_OUTPUT_JACK_15_NAME
   string "Custom string descriptor for output jack with cable number 15"
 	default "OUTPUT_JACK_15_NAME"
 
-  module = USB_MIDI
-  module-str = USB MIDI
-  source "subsys/logging/Kconfig.template.log_config"
+module = USB_MIDI
+module-str = USB MIDI
+source "subsys/logging/Kconfig.template.log_config"
 
 endif #USB_DEVICE_MIDI
