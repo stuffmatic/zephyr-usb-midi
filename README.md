@@ -19,6 +19,8 @@ The [sample app](src/main.c) shows how to send and receive MIDI data. Note on/of
 * __LED 1__ - Flashes when MIDI data is received
 * __LED 2__ - Flashes when MIDI data is sent 
 
+https://user-images.githubusercontent.com/2444852/226658203-de83b3d5-6604-40a9-8dde-cb53ff2cb486.mp4
+
 ## Configuration options
 
 * `CONFIG_USB_DEVICE_MIDI`- Set to `y` to enable the USB MIDI device class driver.
