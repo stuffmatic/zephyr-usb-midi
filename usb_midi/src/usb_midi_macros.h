@@ -30,8 +30,8 @@ BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0), "US
 
 struct jack_string_descriptors
 {
-    LISTIFY(USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ())
-    LISTIFY(USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ())
+    LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ())
+    LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ())
 } _packed;
 
 /* statically initialize a struct jack_string_descriptors */
@@ -49,8 +49,8 @@ struct jack_string_descriptors
 
 USBD_STRING_DESCR_USER_DEFINE(primary)
 struct jack_string_descriptors jack_string_desc = {
-    LISTIFY(USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, ())
-        LISTIFY(USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, ())};
+    LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, ())
+        LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, ())};
 #else
 /* No jack string descriptors by default  */
 #define INPUT_JACK_STRING_DESCR_IDX(jack_idx) 0
