@@ -1,0 +1,29 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "Build unit tests",
+            "command": "/usr/bin/gcc",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${workspaceFolder}/test/usb_midi_packet_test.c",
+                "${workspaceFolder}/usb_midi/src/usb_midi_packet.c",
+                "-o",
+                "${workspaceFolder}/test/usb_midi_packet_test",
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": ""
+        }
+    ],
+    "version": "2.0.0"
+}
