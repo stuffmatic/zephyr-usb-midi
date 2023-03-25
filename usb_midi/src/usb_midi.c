@@ -182,7 +182,7 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	LOG_DBG_PACKET(packet);
 	uint32_t num_written_bytes = 0;
 	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
-	return num_written_bytes;
+	return num_written_bytes == 4 ? 0 : -1;
 }
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {
