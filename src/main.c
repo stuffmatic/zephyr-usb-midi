@@ -2,7 +2,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
-#include "usb_midi/usb_midi.h"
+#include <usb_midi/usb_midi.h>
 
 #define LED_FLASH_DURATION_MS 60
 #define SYSEX_TX_MESSAGE_SIZE 2000
