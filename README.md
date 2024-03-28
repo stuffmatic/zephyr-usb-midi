@@ -1,12 +1,12 @@
 # zephyr-usb-midi
 
-This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for the [Zephyr RTOS](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data (including system exclusive messages) over USB. 
+This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for the [Zephyr RTOS](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data (including system exclusive messages) over USB.
 
 The current implementation, which uses Zephyr's [soon-to-be legacy](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB stack, is usable but should be considered work in progress and needs more testing before it's ready for real world use. If you run into any issues, please consider [reporting them](https://github.com/stuffmatic/zephyr-usb-midi/issues/new) or [submitting a PR](https://github.com/stuffmatic/zephyr-usb-midi/compare).
 
 ## Usage
 
-The USB MIDI device class driver is contained in a Zephyr module. The sample app's [CMakeLists.txt](CMakeLists.txt) file shows one way of adding this module to an app.
+The USB MIDI device class driver is contained in a Zephyr module. The sample app's [CMakeLists.txt](CMakeLists.txt) file shows one way of adding this module to an app. TODO: make sure `CONFIG_USB_DEVICE_MIDI=y` and usb device stack is set.
 
 The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
 
