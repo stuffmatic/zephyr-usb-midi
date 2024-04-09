@@ -6,7 +6,7 @@ The current implementation, which uses Zephyr's [soon-to-be legacy](https://gith
 
 ## Usage
 
-The USB MIDI device class driver is contained in a Zephyr module. The sample app's [CMakeLists.txt](CMakeLists.txt) file shows one way of adding this module to an app. TODO: make sure `CONFIG_USB_DEVICE_MIDI=y` and usb device stack is set.
+The USB MIDI device class driver is contained in a Zephyr module. The sample app's [CMakeLists.txt](CMakeLists.txt) file shows one way of adding this module to an app.
 
 The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
 
