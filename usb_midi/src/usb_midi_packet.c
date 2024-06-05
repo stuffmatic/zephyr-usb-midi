@@ -2,6 +2,8 @@
 
 #define SYSEX_START_BYTE 0xF0
 #define SYSEX_END_BYTE	 0xF7
+#define IS_DATA_BYTE(b) (b < 0x80)
+#define IS_STATUS_BYTE(b) (b >= 0x80)
 
 static enum usb_midi_error_t channel_msg_cin(uint8_t first_byte, uint8_t *cin)
 {
@@ -66,7 +68,7 @@ static enum usb_midi_error_t non_sysex_system_msg_cin(uint8_t first_byte, uint8_
 
 static enum usb_midi_error_t sysex_msg_cin(uint8_t *midi_bytes, uint8_t *cin)
 {
-	int is_data_byte[3] = {midi_bytes[0] < 0x80, midi_bytes[1] < 0x80, midi_bytes[2] < 0x80};
+	int is_data_byte[3] = {IS_DATA_BYTE(midi_bytes[0]), IS_DATA_BYTE(midi_bytes[1]), IS_DATA_BYTE(midi_bytes[2])};
 
 	if (midi_bytes[0] == SYSEX_START_BYTE) {
 		if (midi_bytes[1] == SYSEX_END_BYTE) {
@@ -257,12 +259,51 @@ enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 	case USB_MIDI_CIN_PROGRAM_CHANGE:
 	case USB_MIDI_CIN_CHANNEL_PRESSURE:
 	case USB_MIDI_CIN_PITCH_BEND_CHANGE:
-	case USB_MIDI_CIN_1BYTE_DATA:
 		if (parse_cb->message_cb) {
-			parse_cb->message_cb(&packet.bytes[1], packet.num_midi_bytes,
-					     packet.cable_num);
+			parse_cb->message_cb(&packet.bytes[1], packet.num_midi_bytes, packet.cable_num);
 		}
 		break;
+	case USB_MIDI_CIN_1BYTE_DATA: {
+		/* 
+		 * CoreMIDI uses this CIN every now and then
+		 * to transfer data bytes in the middle of 
+		 * large-ish sysex messages.
+		 * 
+		 * This CIN is also used by some hosts to send
+		 * single status byte MIDI messages.
+		 * 
+		 * Finally, the spec contains the following note about this CIN:
+		 * " in some special cases, an application may prefer not to use 
+		 *   parsed MIDI events. Using CIN=0xF, a MIDI data stream may be 
+		 *   transferred by placing each individual byte in one 32 Bit 
+		 *   USB-MIDI Event Packet. This way, any MIDI data may be 
+		 *   transferred without being parsed. "
+		 * which seems to imply that a class compliant driver
+		 * should also be able to parse a stream of single MIDI bytes? 
+		 * Or at least deliver these single bytes somehow?
+		 * Ignoring this for now.
+		 * 
+		 * TODO: Understand this better.
+		 * 
+		 * See https://forum.pjrc.com/index.php?threads/midi-sysex-single-byte-message-issue.23786/
+		 */
+		uint8_t byte = packet.bytes[1];
+		
+		if (IS_STATUS_BYTE(byte)) {
+			/* 
+			 * We got a single status byte, assume it's a single byte MIDI message.
+			 */
+			if (parse_cb->message_cb) {
+				parse_cb->message_cb(&byte, 1, packet.cable_num);
+			}
+		} else {
+			/* We got a data byte. Assume it's part of an ongoing sysex message */
+			if (parse_cb->sysex_data_cb) {
+				parse_cb->sysex_data_cb(&byte, 1, packet.cable_num);
+			}
+		}
+		break;
+	}
 	case USB_MIDI_CIN_SYSEX_START_OR_CONTINUE: {
 		/*
 		 * Possible cases:
@@ -285,7 +326,6 @@ enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 		}
 		break;
 	}
-
 	case USB_MIDI_CIN_SYS_COMMON_OR_SYSEX_END_1BYTE:
 		if (packet.bytes[1] != SYSEX_END_BYTE) {
 			/* Single byte system common */
