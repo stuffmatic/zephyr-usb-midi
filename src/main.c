@@ -14,7 +14,7 @@
 /* Echo incoming sysex messages? */
 #define SYSEX_ECHO_ENABLED 			  0
 /* Echo at most this many bytes of incoming sysex messages */
-#define SYSEX_ECHO_MAX_LENGTH         1024
+#define SYSEX_ECHO_MAX_LENGTH         65536
 
 /* Send note on/off periodically? */
 #define TX_PERIODIC_NOTE_ENABLED      0
@@ -182,21 +182,22 @@ static void sysex_start_cb(uint8_t cable_num)
 
 static void sysex_data_cb(uint8_t *data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
 {
-	for (int i = 0; i < num_data_bytes; i++) {
-		int dest_idx = sample_app_state.sysex_rx_byte_count + i;
-		if (dest_idx == SYSEX_ECHO_MAX_LENGTH - 1) {
-			// end stored message prematurely by adding end of sysex status byte
-			sample_app_state.sysex_rx_bytes[dest_idx] = 0xf7;
-		}
-		else if (dest_idx >= SYSEX_ECHO_MAX_LENGTH) {
-			break;
-		} 
-		else {
-			sample_app_state.sysex_rx_bytes[dest_idx] = data_bytes[i];
+	if (SYSEX_ECHO_ENABLED) {
+		for (int i = 0; i < num_data_bytes; i++) {
+			int dest_idx = sample_app_state.sysex_rx_byte_count + i;
+			if (dest_idx == SYSEX_ECHO_MAX_LENGTH - 1) {
+				// end stored message prematurely by adding end of sysex status byte
+				sample_app_state.sysex_rx_bytes[dest_idx] = 0xf7;
+			}
+			else if (dest_idx >= SYSEX_ECHO_MAX_LENGTH) {
+				break;
+			} 
+			else {
+				sample_app_state.sysex_rx_bytes[dest_idx] = data_bytes[i];
+			}
 		}
 	}
 	sample_app_state.sysex_rx_byte_count += num_data_bytes;
-	flash_rx_led();
 }
 
 static void sysex_end_cb(uint8_t cable_num)
