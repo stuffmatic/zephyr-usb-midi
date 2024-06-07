@@ -4,32 +4,53 @@
 #include <zephyr/drivers/gpio.h>
 #include <usb_midi/usb_midi.h>
 
-#define LED_FLASH_DURATION_MS 60
-#define SYSEX_TX_MESSAGE_SIZE 2000
-#define SYSEX_TX_CABLE_NUM    0
-#define TX_INTERVAL_MS	      500
-#define TX_NOTE_NUMBER	      69
-#define TX_NOTE_VELOCITY      0x7f
+#define LED_FLASH_DURATION_MS         60
+
+/* Cable number to use for sysex test messages */
+#define SYSEX_TX_TEST_MSG_CABLE_NUM   0
+/* Size in bytes of outgoing sysex test messages */
+#define SYSEX_TX_TEST_MSG_SIZE        170000
+
+/* Echo incoming sysex messages? */
+#define SYSEX_ECHO_ENABLED 			  0
+/* Echo at most this many bytes of incoming sysex messages */
+#define SYSEX_ECHO_MAX_LENGTH         1024
+
+/* Send note on/off periodically? */
+#define TX_PERIODIC_NOTE_ENABLED      0
+#define TX_PERIODIC_NOTE_INTERVAL_MS  500
+#define TX_PERIODIC_NOTE_NUMBER	      69
+#define TX_PERIODIC_NOTE_VELOCITY     0x7f
 
 struct k_work button_press_work;
 struct k_work event_tx_work;
 struct k_work_delayable rx_led_off_work;
 struct k_work_delayable tx_led_off_work;
+static void send_next_sysex_chunk();
 
 /************************ App state ************************/
 struct sample_app_state_t {
 	int usb_midi_is_available;
-	int sysex_rx_data_byte_count;
-	int sysex_tx_data_byte_count;
-	int sysex_tx_in_progress;
 	int tx_note_off;
+	
+	int sysex_rx_byte_count;
+	uint8_t sysex_rx_bytes[SYSEX_ECHO_MAX_LENGTH];
+	int64_t sysex_rx_start_time;
+
+	int sysex_tx_byte_count;
+	int sysex_tx_in_progress;
+	int64_t sysex_tx_start_time;
 };
 
 static struct sample_app_state_t sample_app_state = {.usb_midi_is_available = 0,
-						     .sysex_tx_data_byte_count = 0,
+							 .sysex_rx_byte_count = 0,
+							 .sysex_rx_start_time = 0,
+						     .sysex_tx_byte_count = 0,
+							 .sysex_tx_start_time = 0,
 						     .sysex_tx_in_progress = 0,
-						     .sysex_rx_data_byte_count = 0,
-						     .tx_note_off = 0};
+						     .tx_note_off = 0,
+							 .sysex_rx_byte_count = 0
+							 };
 
 /************************ LEDs ************************/
 static struct gpio_dt_spec usb_midi_available_led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -72,8 +93,8 @@ static void flash_rx_led()
 void on_event_tx(struct k_work *item)
 {
 	if (sample_app_state.usb_midi_is_available && !sample_app_state.sysex_tx_in_progress) {
-		uint8_t msg[3] = {sample_app_state.tx_note_off ? 0x80 : 0x90, TX_NOTE_NUMBER,
-				  TX_NOTE_VELOCITY};
+		uint8_t msg[3] = {sample_app_state.tx_note_off ? 0x80 : 0x90, TX_PERIODIC_NOTE_NUMBER,
+				  TX_PERIODIC_NOTE_VELOCITY};
 		flash_tx_led();
 		usb_midi_tx(0, msg);
 		sample_app_state.tx_note_off = !sample_app_state.tx_note_off;
@@ -86,11 +107,11 @@ void on_button_press(struct k_work *item)
 		/* Send the first chunk of a sysex message that is too large
 		   to be sent at once. Use the tx done callback to send the
 		   next chunk repeatedly until done. */
-		sample_app_state.sysex_tx_in_progress = 1;
-		uint8_t msg[3] = {0xf0, 0x01, 0x02};
-		sample_app_state.sysex_tx_data_byte_count = 3;
 		flash_tx_led();
-		usb_midi_tx(SYSEX_TX_CABLE_NUM, msg);
+		sample_app_state.sysex_tx_in_progress = 1;
+		sample_app_state.sysex_tx_byte_count = 0;
+		sample_app_state.sysex_tx_start_time = k_uptime_get();
+		send_next_sysex_chunk();
 	}
 }
 
@@ -141,20 +162,25 @@ static void midi_message_cb(uint8_t *bytes, uint8_t num_bytes, uint8_t cable_num
 
 static void sysex_start_cb(uint8_t cable_num)
 {
-	sample_app_state.sysex_rx_data_byte_count = 0;
+	sample_app_state.sysex_rx_start_time = k_uptime_get();
+	sample_app_state.sysex_rx_byte_count = 0;
+	sample_app_state.sysex_rx_bytes[0] = 0xf0; 
+	sample_app_state.sysex_rx_byte_count = 1;
 	flash_rx_led();
 }
 
 static void sysex_data_cb(uint8_t *data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
 {
-	sample_app_state.sysex_rx_data_byte_count += num_data_bytes;
-	flash_rx_led();
+	sample_app_state.sysex_rx_byte_count += num_data_bytes;
+	// flash_rx_led();
 }
 
 static void sysex_end_cb(uint8_t cable_num)
 {
-	printk("rx sysex, cable %d: %d data bytes\n", cable_num,
-	       sample_app_state.sysex_rx_data_byte_count);
+	u_int64_t dt = k_uptime_get() - sample_app_state.sysex_rx_start_time;
+	float bytes_per_s = ((float)sample_app_state.sysex_rx_byte_count) / (0.001 * (float)dt);
+	printk("sysex rx done, cable %d: %d bytes in %d ms, %d bytes/s\n", cable_num,
+		sample_app_state.sysex_rx_byte_count + 2, (int)dt, (int)bytes_per_s);
 	flash_rx_led();
 }
 
@@ -167,26 +193,57 @@ static void usb_midi_available_cb(int is_available)
 	}
 }
 
-static void usb_midi_tx_done_cb()
-{
-	if (sample_app_state.sysex_tx_in_progress) {
+static void send_next_sysex_chunk() {
+	__ASSERT_NO_MSG(sample_app_state.sysex_tx_in_progress);
+
+	while (1) {
+		if (usb_midi_tx_buffer_is_full()) {
+			// tx packet is full. send it. 
+			usb_midi_tx_buffer_send();
+			// nothing further for now. wait for tx done callback before
+			// filling the next packet.
+			break;
+		}
+
 		uint8_t chunk[3] = {0, 0, 0};
 		for (int i = 0; i < 3; i++) {
-			if (sample_app_state.sysex_tx_data_byte_count ==
-			    SYSEX_TX_MESSAGE_SIZE - 1) {
-				chunk[i] = 0xf7;
-			} else {
-				chunk[i] = sample_app_state.sysex_tx_data_byte_count % 128;
+			if (sample_app_state.sysex_tx_byte_count == 0) {
+				chunk[i] = 0xf0;
 			}
-			sample_app_state.sysex_tx_data_byte_count++;
-			if (sample_app_state.sysex_tx_data_byte_count == SYSEX_TX_MESSAGE_SIZE) {
-				sample_app_state.sysex_tx_in_progress = 0;
+			else if (sample_app_state.sysex_tx_byte_count == SYSEX_TX_TEST_MSG_SIZE - 1) {
+				chunk[i] = 0xf7;
+			} 
+			else {
+				chunk[i] = sample_app_state.sysex_tx_byte_count % 128;
+			}				
+			sample_app_state.sysex_tx_byte_count++;
+
+			if (sample_app_state.sysex_tx_byte_count == SYSEX_TX_TEST_MSG_SIZE) {
 				break;
 			}
 		}
-		// printk("sending sysex chunk %02x %02x %02x\n", chunk[0], chunk[1], chunk[2]);
-		flash_tx_led();
-		usb_midi_tx(SYSEX_TX_CABLE_NUM, chunk);
+
+		// Add three byte sysex chunk to the current tx packet 
+		usb_midi_tx_buffer_add(SYSEX_TX_TEST_MSG_CABLE_NUM, chunk);
+
+		if (sample_app_state.sysex_tx_byte_count == SYSEX_TX_TEST_MSG_SIZE) {
+			// No more data to add to tx packet. Send it, then we're done.
+			usb_midi_tx_buffer_send();
+			flash_tx_led();
+			u_int64_t dt = k_uptime_get() - sample_app_state.sysex_tx_start_time;
+			float bytes_per_s = ((float)sample_app_state.sysex_tx_byte_count) / (0.001 * (float)dt);
+			printk("sysex tx done, cable %d: %d bytes in %d ms, %d bytes/s\n", SYSEX_TX_TEST_MSG_CABLE_NUM,
+			sample_app_state.sysex_tx_byte_count + 2, (int)dt, (int)bytes_per_s);
+			sample_app_state.sysex_tx_in_progress = 0;
+			break;
+		}
+	}
+}
+
+static void usb_midi_tx_done_cb()
+{
+	if (sample_app_state.sysex_tx_in_progress) {
+		send_next_sysex_chunk();
 	}
 }
 
@@ -216,7 +273,9 @@ void main(void)
 
 	/* Send MIDI messages periodically */
 	while (1) {
-		k_work_submit(&event_tx_work);
-		k_msleep(TX_INTERVAL_MS);
+		if (TX_PERIODIC_NOTE_ENABLED) {
+			k_work_submit(&event_tx_work);
+		}
+		k_msleep(TX_PERIODIC_NOTE_INTERVAL_MS);
 	}
 }

@@ -297,7 +297,7 @@ enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 				parse_cb->message_cb(&byte, 1, packet.cable_num);
 			}
 		} else {
-			/* We got a data byte. Assume it's part of an ongoing sysex message */
+			/* We got a data byte. Assume it's part of an ongoing sysex message. */
 			if (parse_cb->sysex_data_cb) {
 				parse_cb->sysex_data_cb(&byte, 1, packet.cable_num);
 			}

@@ -6,6 +6,8 @@
 /* Require at least one jack */
 BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 jacks");
 
+#define EP_MAX_PACKET_SIZE 0x0040
+
 #ifdef CONFIG_USB_MIDI_USE_CUSTOM_JACK_NAMES
 
 #define OUTPUT_JACK_STRING_DESCR_IDX(jack_idx) (4 + jack_idx)
@@ -141,7 +143,7 @@ struct jack_string_descriptors jack_string_desc = {
         .bDescriptorType = USB_DESC_ENDPOINT,               \
         .bEndpointAddress = 0x01,                           \
         .bmAttributes = 0x02,                               \
-        .wMaxPacketSize = 0x0040,                           \
+        .wMaxPacketSize = EP_MAX_PACKET_SIZE,                  \
         .bInterval = 0x00,                                  \
         .bRefresh = 0x00,                                   \
         .bSynchAddress = 0x00,                              \
@@ -154,7 +156,7 @@ struct jack_string_descriptors jack_string_desc = {
         .bDescriptorType = USB_DESC_ENDPOINT,               \
         .bEndpointAddress = 0x81,                           \
         .bmAttributes = 0x02,                               \
-        .wMaxPacketSize = 0x0040,                           \
+        .wMaxPacketSize = EP_MAX_PACKET_SIZE,                  \
         .bInterval = 0x00,                                  \
         .bRefresh = 0x00,                                   \
         .bSynchAddress = 0x00,                              \

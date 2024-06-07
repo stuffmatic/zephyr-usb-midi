@@ -9,7 +9,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 
-#define LOG_DBG_PACKET(packet) LOG_DBG("USB MIDI packet %02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
+#define LOG_DBG_PACKET(packet) LOG_DBG("%02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
 									   packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3],            \
 									   packet.cable_num, packet.cin, packet.num_midi_bytes)
 
@@ -28,6 +28,9 @@ struct usb_midi_config usb_midi_config_data = {
 	.out_ep = INIT_OUT_EP,
 	.out_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_INPUTS, .BaAssocJackID = {LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + CONFIG_USB_MIDI_NUM_OUTPUTS)}}};
 
+static int temp_tx_buffer_size = 0;
+static uint8_t temp_tx_buffer[EP_MAX_PACKET_SIZE];
+
 static int usb_midi_is_available = false;
 static struct usb_midi_cb_t user_callbacks = {
 	.available_cb = NULL,
@@ -36,6 +39,22 @@ static struct usb_midi_cb_t user_callbacks = {
 	.sysex_data_cb = NULL,
 	.sysex_end_cb = NULL,
 	.sysex_start_cb = NULL};
+
+static void availability_changed(int is_available) {
+	if (usb_midi_is_available == is_available) {
+		return;
+	}
+
+	LOG_INF("device became %s ", is_available ? "available" : "unavailable");
+
+	if (is_available) {
+		temp_tx_buffer_size = 0;
+	}
+	if (user_callbacks.available_cb) {
+		user_callbacks.available_cb(is_available);
+	}
+	usb_midi_is_available = is_available;
+}
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
@@ -47,39 +66,42 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 	user_callbacks.sysex_end_cb = cb->sysex_end_cb;
 }
 
-static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code
-										   ep_status)
+static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 {
-	uint8_t buf[4];
-	uint32_t num_read_bytes = 1;
-	while (num_read_bytes > 0)
-	{
-		int read_rc = usb_read(ep, buf, 4, &num_read_bytes);
-		if (num_read_bytes == 0)
+	if (ep_status == USB_DC_EP_DATA_OUT) {
+		uint8_t buf[4];
+		uint32_t num_read_bytes = 1;
+		while (num_read_bytes > 0)
 		{
-			break;
-		}
-		struct usb_midi_packet_t packet;
-		enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
+			int read_rc = usb_read(ep, buf, 4, &num_read_bytes);
+			if (num_read_bytes == 0)
+			{
+				break;
+			}
+			struct usb_midi_packet_t packet;
+			enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
 
-		if (error != USB_MIDI_SUCCESS)
-		{
-			LOG_WRN("Packet parsing failed with error %d", error);
-		}
-		else
-		{
-			LOG_DBG_PACKET(packet);
-			struct usb_midi_parse_cb_t parse_cb = {
-				.message_cb = user_callbacks.midi_message_cb,
-				.sysex_data_cb = user_callbacks.sysex_data_cb,
-				.sysex_end_cb = user_callbacks.sysex_end_cb,
-				.sysex_start_cb = user_callbacks.sysex_start_cb};
-			error = usb_midi_parse_packet(packet.bytes, &parse_cb);
 			if (error != USB_MIDI_SUCCESS)
 			{
-				LOG_ERR("Failed to parse packet");
+				LOG_ERR("Failed to read packet with error %d", error);
+			}
+			else
+			{
+				LOG_DBG_PACKET(packet);
+				struct usb_midi_parse_cb_t parse_cb = {
+					.message_cb = user_callbacks.midi_message_cb,
+					.sysex_data_cb = user_callbacks.sysex_data_cb,
+					.sysex_end_cb = user_callbacks.sysex_end_cb,
+					.sysex_start_cb = user_callbacks.sysex_start_cb};
+				error = usb_midi_parse_packet(packet.bytes, &parse_cb);
+				if (error != USB_MIDI_SUCCESS)
+				{
+					LOG_ERR("Failed to parse packet with error %d", error);
+				}
 			}
 		}
+	} else {
+		// printk("USB ep status %d\n", ep_status);
 	}
 }
 
@@ -122,12 +144,7 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
 		LOG_DBG("USB_DC_CONFIGURED");
-		if (!usb_midi_is_available && user_callbacks.available_cb)
-		{
-			LOG_INF("USB MIDI device is available");
-			user_callbacks.available_cb(true);
-		}
-		usb_midi_is_available = true;
+		availability_changed(1);
 		break;
 	/** USB connection lost */
 	case USB_DC_DISCONNECTED:
@@ -135,13 +152,7 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 		break;
 	/** USB connection suspended by the HOST */
 	case USB_DC_SUSPEND:
-		LOG_DBG("USB_DC_SUSPEND");
-		if (usb_midi_is_available && user_callbacks.available_cb)
-		{
-			LOG_INF("USB MIDI device is unavailable");
-			user_callbacks.available_cb(false);
-		}
-		usb_midi_is_available = false;
+		availability_changed(0);
 		break;
 	/** USB connection resumed by the HOST */
 	case USB_DC_RESUME:
@@ -180,9 +191,43 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 		return -EINVAL;
 	}
 	LOG_DBG_PACKET(packet);
-	uint32_t num_written_bytes = 0;
-	usb_write(0x81, packet.bytes, 4, &num_written_bytes);
-	return num_written_bytes == 4 ? 0 : -1;
+	int write_result = usb_write(0x81, packet.bytes, 4, NULL);
+	return write_result;
+}
+
+int usb_midi_tx_buffer_is_full() {
+	return temp_tx_buffer_size == EP_MAX_PACKET_SIZE;
+}
+
+int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes) {
+	if (usb_midi_tx_buffer_is_full()) {
+		return -1;
+	}
+
+	struct usb_midi_packet_t packet;
+	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
+	if (error != USB_MIDI_SUCCESS)
+	{
+		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d", midi_bytes[0], midi_bytes[1], midi_bytes[2], error);
+		return -EINVAL;
+	}
+
+	for (int i = 0; i < 4; i++) {
+		temp_tx_buffer[temp_tx_buffer_size] = packet.bytes[i];
+		temp_tx_buffer_size++;
+	}
+	return 0;
+}
+
+int usb_midi_tx_buffer_send() {
+	if (temp_tx_buffer_size > 0) {
+		int write_result = usb_write(0x81, temp_tx_buffer, temp_tx_buffer_size, NULL);
+		if (write_result == 0) {
+			temp_tx_buffer_size = 0;
+		}
+		return write_result;
+	}
+	return 0;
 }
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {

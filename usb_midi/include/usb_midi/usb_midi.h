@@ -53,4 +53,24 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t* handlers);
  */
 int usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
 
+/**
+ * Enqueue a message for transmission. Used to send more than one
+ * message per USB tx packet, which is useful for increasing throughput.
+ * @return 0 if the message was enqueued, otherwise a non-zero number indicating that
+ * usb_midi_tx_packet_send should be called.
+ */
+int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes);
+
+/**
+ * Indicates if more messages can be enqueued for transmission.
+ * @return Zero if more messages can be enqueued. A non-zero number indicates that 
+ * usb_midi_tx_packet_send should be called.
+ */
+int usb_midi_tx_buffer_is_full();
+
+/**
+ * Send enqueued messages, if any, in a single USB packet.
+ */
+int usb_midi_tx_buffer_send();
+
 #endif
