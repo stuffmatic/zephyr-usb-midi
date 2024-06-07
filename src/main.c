@@ -47,6 +47,7 @@ struct sample_app_state_t {
 
 static struct sample_app_state_t sample_app_state = {.usb_midi_is_available = 0,
 							 .sysex_rx_byte_count = 0,
+							 .sysex_tx_in_progress = 0,
 							 .sysex_rx_start_time = 0,
 						     .sysex_tx_byte_count = 0,
 							 .sysex_tx_start_time = 0,
@@ -175,22 +176,42 @@ static void sysex_start_cb(uint8_t cable_num)
 	sample_app_state.sysex_rx_start_time = k_uptime_get();
 	sample_app_state.sysex_rx_byte_count = 0;
 	sample_app_state.sysex_rx_bytes[0] = 0xf0; 
-	sample_app_state.sysex_rx_byte_count = 1;
+	sample_app_state.sysex_rx_byte_count++;
 	flash_rx_led();
 }
 
 static void sysex_data_cb(uint8_t *data_bytes, uint8_t num_data_bytes, uint8_t cable_num)
 {
+	for (int i = 0; i < num_data_bytes; i++) {
+		int dest_idx = sample_app_state.sysex_rx_byte_count + i;
+		if (dest_idx == SYSEX_ECHO_MAX_LENGTH - 1) {
+			// end stored message prematurely by adding end of sysex status byte
+			sample_app_state.sysex_rx_bytes[dest_idx] = 0xf7;
+		}
+		else if (dest_idx >= SYSEX_ECHO_MAX_LENGTH) {
+			break;
+		} 
+		else {
+			sample_app_state.sysex_rx_bytes[dest_idx] = data_bytes[i];
+		}
+	}
 	sample_app_state.sysex_rx_byte_count += num_data_bytes;
 	flash_rx_led();
 }
 
 static void sysex_end_cb(uint8_t cable_num)
 {
-	sample_app_state.sysex_rx_byte_count++; // last 0xf7
+	if (sample_app_state.sysex_rx_byte_count < SYSEX_ECHO_MAX_LENGTH) {
+		sample_app_state.sysex_rx_bytes[sample_app_state.sysex_rx_byte_count] = 0xf7;
+	}
+	sample_app_state.sysex_rx_byte_count++; // account for the last 0xf7
 	u_int64_t dt_ms = k_uptime_get() - sample_app_state.sysex_rx_start_time;
 	log_sysex_transfer_time(0, cable_num, sample_app_state.sysex_rx_byte_count, dt_ms);
 	flash_rx_led();
+	if (SYSEX_ECHO_ENABLED) {
+		sysex_tx_will_start(1, sample_app_state.sysex_rx_byte_count < SYSEX_ECHO_MAX_LENGTH ? sample_app_state.sysex_rx_byte_count : SYSEX_ECHO_MAX_LENGTH, cable_num);
+		send_next_sysex_chunk();
+	}
 }
 
 static void usb_midi_available_cb(int is_available)
@@ -199,12 +220,13 @@ static void usb_midi_available_cb(int is_available)
 	set_usb_midi_available_led(is_available);
 	if (is_available) {
 		sample_app_state.tx_note_off = 0;
+		sample_app_state.sysex_tx_in_progress = 0;
 	}
 }
 
 static uint8_t get_next_sysex_tx_byte() {
 	if (sample_app_state.sysex_tx_is_echo) {
-
+		return sample_app_state.sysex_rx_bytes[sample_app_state.sysex_tx_byte_count];
 	} 
 	else {
 		if (sample_app_state.sysex_tx_byte_count == 0) {
