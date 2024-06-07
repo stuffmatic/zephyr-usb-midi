@@ -210,6 +210,7 @@ static void sysex_end_cb(uint8_t cable_num)
 	log_sysex_transfer_time(0, cable_num, sample_app_state.sysex_rx_byte_count, dt_ms);
 	flash_rx_led();
 	if (SYSEX_ECHO_ENABLED) {
+		printk("Echoing received sysex\n");
 		sysex_tx_will_start(1, sample_app_state.sysex_rx_byte_count < SYSEX_ECHO_MAX_LENGTH ? sample_app_state.sysex_rx_byte_count : SYSEX_ECHO_MAX_LENGTH, cable_num);
 		send_next_sysex_chunk();
 	}
