@@ -15,7 +15,7 @@ config SYSEX_ECHO_ENABLED
     bool "Echo incoming sysex messages?"
     default n
 config SYSEX_ECHO_MAX_LENGTH         
-    int "Echo at most this many bytes of incoming sysex messages"
+    int "Echo at most this many bytes of incoming sysex messages (last byte of truncated messages is replaced with 0xf7)"
     default 65536
 config TX_PERIODIC_NOTE_ENABLED      
     bool "Send note on/off periodically?"

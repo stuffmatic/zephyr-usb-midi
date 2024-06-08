@@ -169,7 +169,8 @@ static void sysex_data_cb(uint8_t *data_bytes, uint8_t num_data_bytes, uint8_t c
 	for (int i = 0; i < num_data_bytes; i++) {
 		int dest_idx = sample_app_state.sysex_rx_byte_count + i;
 		if (dest_idx == CONFIG_SYSEX_ECHO_MAX_LENGTH - 1) {
-			// end stored message prematurely by adding end of sysex status byte
+			// reached max length. end stored message prematurely by adding
+			// end of sysex status byte.
 			sample_app_state.sysex_rx_bytes[dest_idx] = 0xf7;
 		}
 		else if (dest_idx >= CONFIG_SYSEX_ECHO_MAX_LENGTH) {
