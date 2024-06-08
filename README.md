@@ -12,15 +12,9 @@ The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
 
 ## Sample app
 
-The [sample app](src/main.c) can
+The [sample app](src/main.c) demonstrates how to send and receive MIDI messages and how to efficiently stream large sysex messages to the host. It also logs sysex transfer speeds and can echo incoming sysex messages. See [`Kconfig`](Kconfig) for sample app config vars.
 
-* send note on/off periodically when connected to a host
-* echo received sysex messages
-* log sysex transfer rates
-
-See [`Kconfig`](Kconfig) for sample app config vars.
-
-* __Button 1__ - Send sysex message
+* __Button 1__ - Send a large sysex message
 * __LED 1__ - On when the device is connected to a host
 * __LED 2__ - Flashes when MIDI data is received
 * __LED 3__ - Flashes when MIDI data is sent 
