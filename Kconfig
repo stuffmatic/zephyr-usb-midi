@@ -1,0 +1,31 @@
+source "Kconfig.zephyr"
+
+# Sample app config vars
+
+config LED_FLASH_DURATION_MS
+	int
+    default 60
+config SYSEX_TX_TEST_MSG_CABLE_NUM   
+    int "Cable number to use for sysex test messages"
+    default 0 
+config SYSEX_TX_TEST_MSG_SIZE        
+    int "Size in bytes of outgoing sysex test messages"
+    default 170000
+config SYSEX_ECHO_ENABLED 			  
+    bool "Echo incoming sysex messages?"
+    default n
+config SYSEX_ECHO_MAX_LENGTH         
+    int "Echo at most this many bytes of incoming sysex messages"
+    default 65536
+config TX_PERIODIC_NOTE_ENABLED      
+    bool "Send note on/off periodically?"
+    default y
+config TX_PERIODIC_NOTE_INTERVAL_MS  
+    int 
+    default 500
+config TX_PERIODIC_NOTE_NUMBER	      
+    int
+    default 69
+config TX_PERIODIC_NOTE_VELOCITY     
+    int 
+    default 127

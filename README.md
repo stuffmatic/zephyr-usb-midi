@@ -12,12 +12,20 @@ The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
 
 ## Sample app
 
-The [sample app](src/main.c) shows how to send and receive MIDI data. Note on/off messages are sent periodically when connected to a host. The app should work on dev boards with at least one button and three LEDs, for example [stm32f4_disco](https://docs.zephyrproject.org/latest/boards/arm/stm32f4_disco/doc/index.html) and [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html).
+The [sample app](src/main.c) can
+
+* send note on/off periodically when connected to a host
+* echo received sysex messages
+* log sysex transfer rates
+
+See [`Kconfig`](Kconfig) for sample app config vars.
 
 * __Button 1__ - Send sysex message
 * __LED 1__ - On when the device is connected to a host
 * __LED 2__ - Flashes when MIDI data is received
 * __LED 3__ - Flashes when MIDI data is sent 
+
+The app should work on dev boards with at least one button and three LEDs, for example [stm32f4_disco](https://docs.zephyrproject.org/latest/boards/arm/stm32f4_disco/doc/index.html) and [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html).
 
 https://user-images.githubusercontent.com/2444852/226658203-de83b3d5-6604-40a9-8dde-cb53ff2cb486.mp4
 
