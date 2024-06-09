@@ -1,6 +1,6 @@
 # zephyr-usb-midi
 
-This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for the [Zephyr RTOS](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data (including system exclusive messages) over USB.
+This is a [USB MIDI 1.0 device class](https://www.usb.org/sites/default/files/midi10.pdf) driver for the [Zephyr RTOS](https://zephyrproject.org/), which allows sending and receiving [MIDI](https://en.wikipedia.org/wiki/MIDI) data over USB.
 
 The current implementation, which uses Zephyr's [soon-to-be legacy](https://github.com/zephyrproject-rtos/zephyr/issues/42066) USB stack, is usable but should be considered work in progress and needs more testing before it's ready for real world use. If you run into any issues, please consider [reporting them](https://github.com/stuffmatic/zephyr-usb-midi/issues/new) or [submitting a PR](https://github.com/stuffmatic/zephyr-usb-midi/compare).
 
@@ -12,7 +12,7 @@ The public API is defined in [usb_midi.h](usb_midi/include/usb_midi/usb_midi.h).
 
 ## Sample app
 
-The [sample app](src/main.c) demonstrates how to send and receive MIDI messages and how to efficiently stream large sysex messages to the host. It also logs sysex transfer speeds and can echo incoming sysex messages. See [`Kconfig`](Kconfig) for sample app config vars.
+The [sample app](src/main.c) demonstrates how to send and receive MIDI messages and how to efficiently send large sysex messages to the host. It also logs sysex transfer speeds and can echo incoming sysex messages. See [`Kconfig`](Kconfig) for sample app config vars.
 
 * __Button 1__ - Send a large sysex message
 * __LED 1__ - On when the device is connected to a host
