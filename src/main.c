@@ -301,9 +301,9 @@ void main(void)
 
 	/* Send MIDI messages periodically */
 	while (1) {
-		if (CONFIG_TX_PERIODIC_NOTE_ENABLED) {
-			k_work_submit(&event_tx_work);
-		}
+#ifdef CONFIG_TX_PERIODIC_NOTE_ENABLED
+		k_work_submit(&event_tx_work);
+#endif
 		k_msleep(CONFIG_TX_PERIODIC_NOTE_INTERVAL_MS);
 	}
 }
