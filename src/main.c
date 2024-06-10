@@ -222,7 +222,7 @@ static uint8_t get_next_sysex_tx_byte() {
 			return 0xf7;
 		} 
 		else {
-			return sample_app_state.sysex_tx_byte_count % 128;
+			return sample_app_state.sysex_tx_byte_count % 100;
 		}	
 	}
 }
