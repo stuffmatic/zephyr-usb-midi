@@ -3,6 +3,9 @@
 #include <zephyr/usb/usb_device.h>
 #include <zephyr/drivers/gpio.h>
 #include <usb_midi/usb_midi.h>
+#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
+#include <nrfx_clock.h>
+#endif
 
 struct k_work button_press_work;
 struct k_work event_tx_work;
@@ -278,6 +281,10 @@ static void usb_midi_tx_done_cb()
 /****************** Sample app ******************/
 void main(void)
 {
+#if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
+	// Run nrf5340 app core at full speed (128 MHz)
+	nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
+#endif
 	init_leds();
 	init_button();
 
