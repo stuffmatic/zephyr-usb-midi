@@ -34,8 +34,9 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t* handlers);
  * Send a MIDI message with a given cable number. The event must be 1, 2 or 3 
  * bytes long passed in a buffer of length 3 (unused bytes can be set to zero).
  * All non-sysex messages must start with a status byte (no running status).
+ * 
  * Sysex messages with more than three bytes must be split into smaller chunks 
- * by the caller. Below is a list of allowed chunk types that can be combined
+ * by the caller. Below is a list of allowed sysex chunk types that can be combined
  * to form any valid sysex message. Data bytes are denoted by d.
  *
  * F0, F7
