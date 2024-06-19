@@ -7,6 +7,9 @@
 #include <nrfx_clock.h>
 #endif
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(usb_midi_sample);
+
 struct k_work button_press_work;
 struct k_work event_tx_work;
 struct k_work_delayable rx_led_off_work;
@@ -45,7 +48,7 @@ static struct sample_app_state_t sample_app_state = {.usb_midi_is_available = 0,
 
 static void log_sysex_transfer_time(int is_tx, int cable_num, int num_bytes, int time_ms) {
 	float bytes_per_s = time_ms == 0 ? 0 : (float)num_bytes / (0.001 * time_ms);
-	printk("sysex %s done | cable %d | %d bytes in %d ms | %d bytes/s\n", is_tx ? "tx" : "rx", cable_num,
+	LOG_INF("sysex %s done | cable %d | %d bytes in %d ms | %d bytes/s", is_tx ? "tx" : "rx", cable_num,
 		num_bytes, (int)time_ms, (int)bytes_per_s);
 }
 
@@ -197,7 +200,7 @@ static void sysex_end_cb(uint8_t cable_num)
 	log_sysex_transfer_time(0, cable_num, sample_app_state.sysex_rx_byte_count, dt_ms);
 	flash_rx_led();
 #ifdef CONFIG_SYSEX_ECHO_ENABLED
-	printk("Echoing received sysex\n");
+	LOG_INF("Echoing received sysex");
 	sysex_tx_will_start(1, sample_app_state.sysex_rx_byte_count < CONFIG_SYSEX_ECHO_MAX_LENGTH ? sample_app_state.sysex_rx_byte_count : CONFIG_SYSEX_ECHO_MAX_LENGTH, cable_num);
 	send_next_sysex_chunk();
 #endif
