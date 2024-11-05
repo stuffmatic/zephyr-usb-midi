@@ -260,6 +260,9 @@ static void send_next_sysex_chunk() {
 		}
 
 		// Enqueue three byte sysex chunk for transmission
+		// TODO: check if this suceeds or not? Currently, this check is not needed
+		// since each MIDI message is put into a 4 byte packet and the tx buffer size
+		// is a multiple of 4. 
 		usb_midi_tx_buffer_add(sample_app_state.sysex_tx_cable_num, chunk);
 
 		if (sample_app_state.sysex_tx_byte_count == sysex_msg_size) {
