@@ -1,6 +1,6 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/usb/usb_device.h>
+#include <zephyr/usb/usbd.h>
 #include <zephyr/drivers/gpio.h>
 #include <usb_midi/usb_midi.h>
 #if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
@@ -309,8 +309,8 @@ void main(void)
 	usb_midi_register_callbacks(&callbacks);
 
 	/* Init USB */
-	int enable_rc = usb_enable(NULL);
-	__ASSERT(enable_rc == 0, "Failed to enable USB");
+	// int enable_rc = usb_enable(NULL);
+	// __ASSERT(enable_rc == 0, "Failed to enable USB");
 
 	/* Send MIDI messages periodically */
 	while (1) {

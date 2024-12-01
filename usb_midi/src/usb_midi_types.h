@@ -2,7 +2,7 @@
 #define ZEPHYR_USB_MIDI_TYPES_H_
 
 #include <zephyr/init.h>
-#include <zephyr/usb/usb_device.h>
+#include <zephyr/usb/usbd.h>
 
 /** 
  * MS (MIDI streaming) Class-Specific Interface Descriptor Subtypes. 

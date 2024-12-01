@@ -3,7 +3,7 @@
 
 config USB_DEVICE_MIDI
 	bool "USB MIDI device class driver"
-	depends on USB_DEVICE_STACK
+	depends on USB_DEVICE_STACK_NEXT
 
 if USB_DEVICE_MIDI
 

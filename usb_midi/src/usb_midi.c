@@ -1,6 +1,5 @@
 #include <zephyr/init.h>
-#include <zephyr/usb/usb_device.h>
-#include <usb_descriptor.h>
+#include <zephyr/usb/usbd.h>
 #include <usb_midi/usb_midi.h>
 #include "usb_midi_types.h"
 #include "usb_midi_macros.h"
@@ -13,7 +12,7 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 									   packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3],            \
 									   packet.cable_num, packet.cin, packet.num_midi_bytes)
 
-USBD_CLASS_DESCR_DEFINE(primary, 0)
+// USBD_CLASS_DESCR_DEFINE(primary, 0)
 struct usb_midi_config usb_midi_config_data = {
 	.ac_if = INIT_AC_IF,
 	.ac_cs_if = INIT_AC_CS_IF,
@@ -40,6 +39,7 @@ static struct usb_midi_cb_t user_callbacks = {
 	.sysex_end_cb = NULL,
 	.sysex_start_cb = NULL};
 
+/*
 static void availability_changed(int is_available) {
 	if (usb_midi_is_available == is_available) {
 		return;
@@ -54,7 +54,7 @@ static void availability_changed(int is_available) {
 		user_callbacks.available_cb(is_available);
 	}
 	usb_midi_is_available = is_available;
-}
+} */
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {
@@ -66,7 +66,7 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 	user_callbacks.sysex_end_cb = cb->sysex_end_cb;
 }
 
-static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
+/* static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 {
 	if (ep_status == USB_DC_EP_DATA_OUT) {
 		uint8_t buf[4];
@@ -129,61 +129,61 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 {
 	switch (cb_status)
 	{
-	/** USB error reported by the controller */
+	// USB error reported by the controller
 	case USB_DC_ERROR:
 		LOG_DBG("USB_DC_ERROR");
 		break;
-	/** USB reset */
+	// USB reset 
 	case USB_DC_RESET:
 		LOG_DBG("USB_DC_RESET");
 		break;
-	/** USB connection established, hardware enumeration is completed */
+	// USB connection established, hardware enumeration is completed 
 	case USB_DC_CONNECTED:
 		LOG_DBG("USB_DC_CONNECTED");
 		break;
-	/** USB configuration done */
+	// USB configuration done
 	case USB_DC_CONFIGURED:
 		LOG_DBG("USB_DC_CONFIGURED");
 		availability_changed(1);
 		break;
-	/** USB connection lost */
+	// USB connection lost
 	case USB_DC_DISCONNECTED:
 		LOG_DBG("USB_DC_DISCONNECTED");
 		break;
-	/** USB connection suspended by the HOST */
+	// USB connection suspended by the HOST
 	case USB_DC_SUSPEND:
 		availability_changed(0);
 		break;
-	/** USB connection resumed by the HOST */
+	// USB connection resumed by the HOST
 	case USB_DC_RESUME:
 		LOG_DBG("USB_DC_RESUME");
 		break;
-	/** USB interface selected */
+	// USB interface selected
 	case USB_DC_INTERFACE:
 		LOG_DBG("USB_DC_INTERFACE");
 		break;
-	/** Set Feature ENDPOINT_HALT received */
+	// Set Feature ENDPOINT_HALT received
 	case USB_DC_SET_HALT:
 		LOG_DBG("USB_DC_SET_HALT");
 		break;
-	/** Clear Feature ENDPOINT_HALT received */
+	// Clear Feature ENDPOINT_HALT received
 	case USB_DC_CLEAR_HALT:
 		LOG_DBG("USB_DC_CLEAR_HALT");
 		break;
-	/** Start of Frame received */
+	// Start of Frame received 
 	case USB_DC_SOF:
 		LOG_DBG("USB_DC_SOF");
 		break;
-	/** Initial USB connection status */
+	// Initial USB connection status
 	case USB_DC_UNKNOWN:
 		LOG_DBG("USB_DC_UNKNOWN");
 		break;
 	}
-}
+} */
 
 int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
-	struct usb_midi_packet_t packet;
+	/* struct usb_midi_packet_t packet;
 	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
 	if (error != USB_MIDI_SUCCESS)
 	{
@@ -192,7 +192,7 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	}
 	LOG_DBG_PACKET(packet);
 	int write_result = usb_write(0x81, packet.bytes, 4, NULL);
-	return write_result;
+	return write_result; */
 }
 
 int usb_midi_tx_buffer_is_full() {
@@ -220,17 +220,17 @@ int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes) {
 }
 
 int usb_midi_tx_buffer_send() {
-	if (temp_tx_buffer_size > 0) {
+	/* if (temp_tx_buffer_size > 0) {
 		int write_result = usb_write(0x81, temp_tx_buffer, temp_tx_buffer_size, NULL);
 		if (write_result == 0) {
 			temp_tx_buffer_size = 0;
 		}
 		return write_result;
 	}
-	return 0;
+	return 0; */
 }
 
-USBD_DEFINE_CFG_DATA(usb_midi_config) = {
+/* USBD_DEFINE_CFG_DATA(usb_midi_config) = {
 	.usb_device_description = NULL,
 	.interface_config = NULL,
 	.interface_descriptor = &usb_midi_config_data.ac_if,
@@ -242,4 +242,4 @@ USBD_DEFINE_CFG_DATA(usb_midi_config) = {
 	},
 	.num_endpoints = ARRAY_SIZE(midi_ep_cfg),
 	.endpoint = midi_ep_cfg,
-};
+}; */

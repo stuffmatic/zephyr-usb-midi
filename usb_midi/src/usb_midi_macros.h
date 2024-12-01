@@ -49,7 +49,7 @@ struct jack_string_descriptors
         .bDescriptorType = USB_DESC_STRING,                                                        \
         .bString = CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME},
 
-USBD_STRING_DESCR_USER_DEFINE(primary)
+// USBD_STRING_DESCR_USER_DEFINE(primary)
 struct jack_string_descriptors jack_string_desc = {
     LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, ())
         LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, ())};
