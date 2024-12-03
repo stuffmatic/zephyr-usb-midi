@@ -285,6 +285,31 @@ static void usb_midi_tx_done_cb()
 }
 
 /****************** Sample app ******************/
+USBD_DESC_CONFIG_DEFINE(fs_cfg_desc, "FS Configuration");
+USBD_DESC_CONFIG_DEFINE(hs_cfg_desc, "HS Configuration");
+
+/* doc configuration instantiation start */
+static const uint8_t attributes = (IS_ENABLED(CONFIG_SAMPLE_USBD_SELF_POWERED) ?
+				   USB_SCD_SELF_POWERED : 0) |
+				  (IS_ENABLED(CONFIG_SAMPLE_USBD_REMOTE_WAKEUP) ?
+				   USB_SCD_REMOTE_WAKEUP : 0);
+
+/* Full speed configuration */
+#define CONFIG_SAMPLE_USBD_MAX_POWER 250
+USBD_CONFIGURATION_DEFINE(sample_fs_config,
+			  attributes,
+			  CONFIG_SAMPLE_USBD_MAX_POWER, &fs_cfg_desc);
+
+/* High speed configuration */
+USBD_CONFIGURATION_DEFINE(sample_hs_config,
+			  attributes,
+			  CONFIG_SAMPLE_USBD_MAX_POWER, &hs_cfg_desc);
+/* doc configuration instantiation end */
+
+USBD_DEVICE_DEFINE(usbd,
+		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
+		   CONFIG_USB_MIDI_DEVICE_VID, CONFIG_USB_MIDI_DEVICE_PID);
+
 void main(void)
 {
 #if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
@@ -293,6 +318,20 @@ void main(void)
 #endif
 	init_leds();
 	init_button();
+
+	int add_config_result = usbd_add_configuration(&usbd, USBD_SPEED_FS,
+				     &sample_fs_config);
+	printk("usbd_add_configuration result %d\n", add_config_result);
+	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
+	printk("usbd_register_class result %d\n", register_result);
+	register_result = usbd_register_class(&usbd, "usb_midi", USBD_SPEED_HS, 1);
+	printk("usbd_register_class result %d\n", register_result);
+	int init_result = usbd_init(&usbd);
+	printk("usbd_init result %d\n", init_result);
+	int enable_result = usbd_enable(&usbd);
+	printk("usbd_enable result %d\n", enable_result);
+
+
 
 	k_work_init(&button_press_work, on_button_press);
 	k_work_init(&event_tx_work, on_event_tx);

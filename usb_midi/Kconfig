@@ -1,11 +1,18 @@
 # Copyright (c) 2019 Nordic Semiconductor
 # SPDX-License-Identifier: Apache-2.0
 
+
+
 config USB_DEVICE_MIDI
 	bool "USB MIDI device class driver"
 	depends on USB_DEVICE_STACK_NEXT
 
 if USB_DEVICE_MIDI
+
+config USB_MIDI_DEVICE_VID
+  hex ""
+config USB_MIDI_DEVICE_PID
+  hex ""
 
 config USB_MIDI_NUM_INPUTS
   int "The number of jacks through which MIDI data flows into the device."
