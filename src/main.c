@@ -315,7 +315,7 @@ USBD_DESC_MANUFACTURER_DEFINE(sample_mfr, CONFIG_SAMPLE_APP_MANUFACTURER_NAME);
 USBD_DESC_PRODUCT_DEFINE(sample_product, CONFIG_SAMPLE_APP_PRODUCT_NAME);
 USBD_DESC_SERIAL_NUMBER_DEFINE(sample_sn); // TODO: where does WHID come from?
 
-void main(void)
+int main(void)
 {
 #if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
 	// Run nrf5340 app core at full speed (128 MHz)
@@ -324,9 +324,18 @@ void main(void)
 	init_leds();
 	init_button();
 
+	
+	
 	int add_config_result = usbd_add_configuration(&usbd, USBD_SPEED_FS,
 				     &sample_fs_config);
 					 /* doc add string descriptor start */
+	printk("usbd_add_configuration result %d\n", add_config_result);
+	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
+	printk("usbd_register_class result %d\n", register_result);
+	// register_result = usbd_register_class(&usbd, "usb_midi", USBD_SPEED_HS, 1);
+	// printk("usbd_register_class result %d\n", register_result);
+
+
 	int err = usbd_add_descriptor(&usbd, &sample_lang);
 	if (err) {
 		LOG_ERR("Failed to initialize language descriptor (%d)", err);
@@ -347,17 +356,11 @@ void main(void)
 		LOG_ERR("Failed to initialize SN descriptor (%d)", err);
 		return NULL;
 	}
-	printk("usbd_add_configuration result %d\n", add_config_result);
-	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
-	printk("usbd_register_class result %d\n", register_result);
-	register_result = usbd_register_class(&usbd, "usb_midi", USBD_SPEED_HS, 1);
-	printk("usbd_register_class result %d\n", register_result);
+
 	int init_result = usbd_init(&usbd);
 	printk("usbd_init result %d\n", init_result);
 	int enable_result = usbd_enable(&usbd);
 	printk("usbd_enable result %d\n", enable_result);
-
-
 
 	k_work_init(&button_press_work, on_button_press);
 	k_work_init(&event_tx_work, on_event_tx);

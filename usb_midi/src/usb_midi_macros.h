@@ -6,7 +6,7 @@
 /* Require at least one jack */
 BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0), "USB MIDI device must have more than 0 jacks");
 
-#define EP_MAX_PACKET_SIZE 0x0040 // TODO: ensure right endianness
+#define EP_MAX_PACKET_SIZE 0x0040 // TODO: ensure right endianness sys_cpu_to_le16(xxxU)
 
 #ifdef CONFIG_USB_MIDI_USE_CUSTOM_JACK_NAMES
 

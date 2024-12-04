@@ -1,5 +1,6 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usbd.h>
+#include <zephyr/drivers/usb/udc.h>
 #include <usb_midi/usb_midi.h>
 #include "usb_midi_types.h"
 #include "usb_midi_macros.h"
@@ -54,8 +55,12 @@ const static struct usb_desc_header *xxx[] = {
 	(struct usb_desc_header *)&usb_midi_config_data.ac_cs_if,
 	(struct usb_desc_header *)&usb_midi_config_data.ms_if,
 	(struct usb_desc_header *)&usb_midi_config_data.ms_cs_if,
+	#if CONFIG_USB_MIDI_NUM_OUTPUTS > 0
 	LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUT_JACK_PTR, (, )),
+	#endif
+	#if CONFIG_USB_MIDI_NUM_INPUTS > 0
 	LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IN_JACK_PTR, (, )),
+	#endif
 	(struct usb_desc_header *)&usb_midi_config_data.element,
 	(struct usb_desc_header *)&usb_midi_config_data.in_ep,
 	(struct usb_desc_header *)&usb_midi_config_data.in_cs_ep,
@@ -65,14 +70,13 @@ const static struct usb_desc_header *xxx[] = {
 };
 
 struct usb_midi_data {
-	struct usb_midi_config *const desc;
+	// struct usb_midi_config *const desc;
 	const struct usb_desc_header **const fs_desc;
 	const struct usb_desc_header **const hs_desc;
-	atomic_t state;
 };
 
 static struct usb_midi_data usb_midi_data = {
-	.desc = &usb_midi_config_data,
+	// .desc = &usb_midi_config_data,
 	.fs_desc = &xxx[0],
 	.hs_desc = &xxx[0],
 };
@@ -88,6 +92,7 @@ static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 					      .sysex_end_cb = NULL,
 					      .sysex_start_cb = NULL};
 
+// TODO: needed?
 #define USB_MIDI_VENDOR_REQ_OUT 0x5b
 #define USB_MIDI_VENDOR_REQ_IN	0x5c
 
@@ -272,9 +277,9 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	
 	struct net_buf* buf = usbd_ep_buf_alloc(&usb_midi, 0x81, 4);
 	int add_result = net_buf_add_mem(buf, packet.bytes, 4);
-	LOG_DBG("add_result %d", add_result);
+	// LOG_DBG("add_result %d", add_result);
 	int enq_result = usbd_ep_enqueue(&usb_midi, buf);
-	LOG_DBG("enq_result %d", enq_result);
+	// LOG_DBG("enq_result %d", enq_result);
 }
 
 int usb_midi_tx_buffer_is_full()
@@ -401,10 +406,23 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 	struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
 	struct udc_buf_info *bi = NULL;
 
-	// bi = (struct udc_buf_info *)net_buf_user_data(buf);
-	// LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
-	LOG_DBG("usb_midi_request_cb");
-	return usbd_ep_buf_free(uds_ctx, buf);
+	struct usb_midi_packet_t packet;
+	usb_midi_packet_from_usb_bytes(buf->data, &packet);
+	LOG_DBG_PACKET(packet);
+
+	bi = (struct udc_buf_info *)net_buf_user_data(buf);
+	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
+	// usbd_ep_buf_free(uds_ctx, buf);
+
+
+	// LOG_DBG("usb_midi_request_cb");
+	// TODO: move to function
+	struct net_buf* next_buf = buf; // usbd_ep_buf_alloc(c_data, 0x01, 4);
+	net_buf_reset(next_buf);
+	int r = usbd_ep_enqueue(c_data, next_buf);
+	// printk("usbd_ep_enqueue, result %d\n", r);
+	return 0;
+	// return usbd_ep_buf_free(uds_ctx, buf);
 }
 
 /** USB power management handler suspended */
@@ -438,6 +456,11 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 	if (user_callbacks.available_cb) {
 		user_callbacks.available_cb(1);
 	}
+	// TODO: move to function
+	// TODO: leaks one buffer per enable
+	struct net_buf* buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
+	int r = usbd_ep_enqueue(c_data, buf);
+	printk("usbd_ep_enqueue, result %d\n", r);
 }
 
 /** Class associated configuration is disabled */
@@ -453,6 +476,8 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 int usb_midi_init_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
+	
+
 	return 0;
 }
 
@@ -492,7 +517,7 @@ struct usbd_class_api usb_midi_api = {
 	.get_desc = usb_midi_get_desc_cb
 };
 
-USBD_DEFINE_CLASS(usb_midi, &usb_midi_api, &usb_midi_data, &usb_midi_vregs);
+USBD_DEFINE_CLASS(usb_midi, &usb_midi_api, &usb_midi_data, NULL); // &usb_midi_vregs);
 
 void usb_midi_init(struct usb_midi_cb_t *cb)
 {
