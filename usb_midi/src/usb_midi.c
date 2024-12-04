@@ -14,6 +14,7 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 		packet.num_midi_bytes)
 
 // USBD_CLASS_DESCR_DEFINE(primary, 0)
+static struct usbd_class_data usb_midi; // TODO: remove
 
 struct usb_midi_config usb_midi_config_data = {
 	.ac_if = INIT_AC_IF,
@@ -61,6 +62,19 @@ const static struct usb_desc_header *xxx[] = {
 	(struct usb_desc_header *)&usb_midi_config_data.out_ep,
 	(struct usb_desc_header *)&usb_midi_config_data.out_cs_ep,
 	&nil_desc
+};
+
+struct usb_midi_data {
+	struct usb_midi_config *const desc;
+	const struct usb_desc_header **const fs_desc;
+	const struct usb_desc_header **const hs_desc;
+	atomic_t state;
+};
+
+static struct usb_midi_data usb_midi_data = {
+	.desc = &usb_midi_config_data,
+	.fs_desc = &xxx[0],
+	.hs_desc = &xxx[0],
 };
 
 static int temp_tx_buffer_size = 0;
@@ -245,16 +259,22 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 
 int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
-	/* struct usb_midi_packet_t packet;
+	struct usb_midi_packet_t packet;
 	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number,
 	&packet); if (error != USB_MIDI_SUCCESS)
 	{
 		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d",
-	midi_bytes[0], midi_bytes[1], midi_bytes[2], error); return -EINVAL;
+		midi_bytes[0], midi_bytes[1], midi_bytes[2], error); return -EINVAL;
 	}
-	LOG_DBG_PACKET(packet);
-	int write_result = usb_write(0x81, packet.bytes, 4, NULL);
-	return write_result; */
+	// LOG_DBG_PACKET(packet);
+	// int write_result = usb_write(0x81, packet.bytes, 4, NULL);
+	// return write_result; */
+	
+	struct net_buf* buf = usbd_ep_buf_alloc(&usb_midi, 0x81, 4);
+	int add_result = net_buf_add_mem(buf, packet.bytes, 4);
+	LOG_DBG("add_result %d", add_result);
+	int enq_result = usbd_ep_enqueue(&usb_midi, buf);
+	LOG_DBG("enq_result %d", enq_result);
 }
 
 int usb_midi_tx_buffer_is_full()
@@ -310,18 +330,7 @@ int usb_midi_tx_buffer_send()
 	.endpoint = midi_ep_cfg,
 }; */
 
-struct usb_midi_data {
-	struct usb_midi_config *const desc;
-	const struct usb_desc_header **const fs_desc;
-	const struct usb_desc_header **const hs_desc;
-	atomic_t state;
-};
 
-static struct usb_midi_data usb_midi_data = {
-	.desc = &usb_midi_config_data,
-	.fs_desc = &xxx[0],
-	.hs_desc = &xxx[0],
-};
 
 /** Feature halt state update handler */
 void usb_midi_feature_halt_cb(struct usbd_class_data *const c_data, uint8_t ep, bool halted)
@@ -342,6 +351,7 @@ int usb_midi_control_to_dev_cb(struct usbd_class_data *const c_data,
 			    const struct usb_setup_packet *const setup,
 			    const struct net_buf *const buf)
 {
+	LOG_DBG("usb_midi_control_to_dev_cb");
 	if (setup->RequestType.recipient != USB_REQTYPE_RECIPIENT_DEVICE) {
 		errno = -ENOTSUP;
 		return 0;
@@ -364,6 +374,7 @@ int usb_midi_control_to_dev_cb(struct usbd_class_data *const c_data,
 int usb_midi_control_to_host_cb(struct usbd_class_data *const c_data,
 			     const struct usb_setup_packet *const setup, struct net_buf *const buf)
 {
+	LOG_DBG("usb_midi_control_to_host_cb");
 	if (setup->RequestType.recipient != USB_REQTYPE_RECIPIENT_DEVICE) {
 		errno = -ENOTSUP;
 		return 0;
@@ -387,15 +398,13 @@ int usb_midi_control_to_host_cb(struct usbd_class_data *const c_data,
 /** Endpoint request completion event handler */
 int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *buf, int err)
 {
-	/* struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
+	struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
 	struct udc_buf_info *bi = NULL;
 
-	bi = (struct udc_buf_info *)net_buf_user_data(buf);
-	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
-
-	return usbd_ep_buf_free(uds_ctx, buf); */
-	LOG_DBG("Instance %p, buf %p, err %d", c_data, buf, err);
-	return 0;
+	// bi = (struct udc_buf_info *)net_buf_user_data(buf);
+	// LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
+	LOG_DBG("usb_midi_request_cb");
+	return usbd_ep_buf_free(uds_ctx, buf);
 }
 
 /** USB power management handler suspended */
@@ -411,8 +420,14 @@ void usb_midi_resumed_cb(struct usbd_class_data *const c_data)
 }
 
 /** Start of Frame */
+static int sof_debug_ctr = 0;
 void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 {
+	sof_debug_ctr++;
+	if (sof_debug_ctr % 1000 == 0) {
+		// LOG_DBG("Instance %p", c_data);
+		sof_debug_ctr = 0;
+	} 
 	// LOG_DBG("Instance %p", c_data);
 }
 
@@ -420,12 +435,18 @@ void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
+	if (user_callbacks.available_cb) {
+		user_callbacks.available_cb(1);
+	}
 }
 
 /** Class associated configuration is disabled */
 void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
+	if (user_callbacks.available_cb) {
+		user_callbacks.available_cb(0);
+	}
 }
 
 /** Initialization of the class implementation */
