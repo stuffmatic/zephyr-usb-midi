@@ -29,3 +29,11 @@ config TX_PERIODIC_NOTE_NUMBER
 config TX_PERIODIC_NOTE_VELOCITY     
     int 
     default 127
+config SAMPLE_APP_MANUFACTURER_NAME
+    string "Sample app USB device manufacturer name"
+config SAMPLE_APP_PRODUCT_NAME
+    string "Sample app USB device name"
+config SAMPLE_APP_DEVICE_PID
+    hex "Sample app USB device product id"
+config SAMPLE_APP_DEVICE_VID
+    hex "Sample app USB device vendor id"

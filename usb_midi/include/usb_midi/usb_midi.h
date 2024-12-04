@@ -26,9 +26,9 @@ struct usb_midi_cb_t {
 };
 
 /**
- * Register callbacks to invoke when receiving MIDI messages etc.
+ * TODO
  */
-void usb_midi_register_callbacks(struct usb_midi_cb_t* handlers);
+void usb_midi_init(struct usb_midi_cb_t* handlers);
 
 /**
  * Send a MIDI message with a given cable number. The event must be 1, 2 or 3 

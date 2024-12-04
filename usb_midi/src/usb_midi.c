@@ -107,7 +107,7 @@ static void availability_changed(int is_available) {
 
 USBD_DEVICE_DEFINE(usb_device,
 		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
-		   CONFIG_USB_MIDI_DEVICE_VID, CONFIG_USB_MIDI_DEVICE_PID);
+		   CONFIG_USB_DEVICE_VID, CONFIG_USB_DEVICE_PID);
 
 static const uint8_t attributes = (IS_ENABLED(CONFIG_SAMPLE_USBD_SELF_POWERED) ?
 				   USB_SCD_SELF_POWERED : 0) |
@@ -324,21 +324,21 @@ static struct usb_midi_data usb_midi_data = {
 };
 
 /** Feature halt state update handler */
-void usb_midi_feature_halt(struct usbd_class_data *const c_data, uint8_t ep, bool halted)
+void usb_midi_feature_halt_cb(struct usbd_class_data *const c_data, uint8_t ep, bool halted)
 {
 	LOG_DBG("Instance %p, ep %u, halted %d",
 		c_data, ep, halted);
 }
 
 /** Configuration update handler */
-void usb_midi_update(struct usbd_class_data *const c_data, uint8_t iface, uint8_t alternate)
+void usb_midi_update_cb(struct usbd_class_data *const c_data, uint8_t iface, uint8_t alternate)
 {
 	LOG_DBG("Instance %p, interface %u alternate %u changed",
 		c_data, iface, alternate);
 }
 
 /** USB control request handler to device */
-int usb_midi_control_to_dev(struct usbd_class_data *const c_data,
+int usb_midi_control_to_dev_cb(struct usbd_class_data *const c_data,
 			    const struct usb_setup_packet *const setup,
 			    const struct net_buf *const buf)
 {
@@ -361,7 +361,7 @@ int usb_midi_control_to_dev(struct usbd_class_data *const c_data,
 }
 
 /** USB control request handler to host */
-int usb_midi_control_to_host(struct usbd_class_data *const c_data,
+int usb_midi_control_to_host_cb(struct usbd_class_data *const c_data,
 			     const struct usb_setup_packet *const setup, struct net_buf *const buf)
 {
 	if (setup->RequestType.recipient != USB_REQTYPE_RECIPIENT_DEVICE) {
@@ -385,7 +385,7 @@ int usb_midi_control_to_host(struct usbd_class_data *const c_data,
 }
 
 /** Endpoint request completion event handler */
-int usb_midi_request(struct usbd_class_data *const c_data, struct net_buf *buf, int err)
+int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *buf, int err)
 {
 	/* struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
 	struct udc_buf_info *bi = NULL;
@@ -399,50 +399,50 @@ int usb_midi_request(struct usbd_class_data *const c_data, struct net_buf *buf, 
 }
 
 /** USB power management handler suspended */
-void usb_midi_suspended(struct usbd_class_data *const c_data)
+void usb_midi_suspended_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 }
 
 /** USB power management handler resumed */
-void usb_midi_resumed(struct usbd_class_data *const c_data)
+void usb_midi_resumed_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 }
 
 /** Start of Frame */
-void usb_midi_sof(struct usbd_class_data *const c_data)
+void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 {
 	// LOG_DBG("Instance %p", c_data);
 }
 
 /** Class associated configuration is selected */
-void usb_midi_enable(struct usbd_class_data *const c_data)
+void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 }
 
 /** Class associated configuration is disabled */
-void usb_midi_disable(struct usbd_class_data *const c_data)
+void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 }
 
 /** Initialization of the class implementation */
-int usb_midi_init(struct usbd_class_data *const c_data)
+int usb_midi_init_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 	return 0;
 }
 
 /** Shutdown of the class implementation */
-void usb_midi_shutdown(struct usbd_class_data *const c_data)
+void usb_midi_shutdown_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 }
  
 /** Get function descriptor based on speed parameter */
-void *usb_midi_get_desc(struct usbd_class_data *const c_data, const enum usbd_speed speed)
+void *usb_midi_get_desc_cb(struct usbd_class_data *const c_data, const enum usbd_speed speed)
 {
 	LOG_DBG("Instance %p, speed %d", c_data, speed);
 
@@ -456,24 +456,24 @@ void *usb_midi_get_desc(struct usbd_class_data *const c_data, const enum usbd_sp
 }
 
 struct usbd_class_api usb_midi_api = {
-	.feature_halt = usb_midi_feature_halt,
-	.update = usb_midi_update, 
-	.control_to_dev = usb_midi_control_to_dev,
-	.control_to_host = usb_midi_control_to_host,
-	.request = usb_midi_request,
-	.suspended = usb_midi_suspended,
-	.resumed = usb_midi_resumed,
-	.sof = usb_midi_sof,
-	.enable = usb_midi_enable,
-	.disable = usb_midi_disable,
-	.init = usb_midi_init,
-	.shutdown = usb_midi_shutdown,
-	.get_desc = usb_midi_get_desc
+	.feature_halt = usb_midi_feature_halt_cb,
+	.update = usb_midi_update_cb, 
+	.control_to_dev = usb_midi_control_to_dev_cb,
+	.control_to_host = usb_midi_control_to_host_cb,
+	.request = usb_midi_request_cb,
+	.suspended = usb_midi_suspended_cb,
+	.resumed = usb_midi_resumed_cb,
+	.sof = usb_midi_sof_cb,
+	.enable = usb_midi_enable_cb,
+	.disable = usb_midi_disable_cb,
+	.init = usb_midi_init_cb,
+	.shutdown = usb_midi_shutdown_cb,
+	.get_desc = usb_midi_get_desc_cb
 };
 
 USBD_DEFINE_CLASS(usb_midi, &usb_midi_api, &usb_midi_data, &usb_midi_vregs);
 
-void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
+void usb_midi_init(struct usb_midi_cb_t *cb)
 {
 	user_callbacks.available_cb = cb->available_cb;
 	user_callbacks.midi_message_cb = cb->midi_message_cb;
@@ -481,5 +481,4 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 	user_callbacks.sysex_start_cb = cb->sysex_start_cb;
 	user_callbacks.sysex_data_cb = cb->sysex_data_cb;
 	user_callbacks.sysex_end_cb = cb->sysex_end_cb;
-	
 }

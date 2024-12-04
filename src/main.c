@@ -308,7 +308,12 @@ USBD_CONFIGURATION_DEFINE(sample_hs_config,
 
 USBD_DEVICE_DEFINE(usbd,
 		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
-		   CONFIG_USB_MIDI_DEVICE_VID, CONFIG_USB_MIDI_DEVICE_PID);
+		   CONFIG_SAMPLE_APP_DEVICE_VID, CONFIG_SAMPLE_APP_DEVICE_PID);
+
+USBD_DESC_LANG_DEFINE(sample_lang);
+USBD_DESC_MANUFACTURER_DEFINE(sample_mfr, CONFIG_SAMPLE_APP_MANUFACTURER_NAME);
+USBD_DESC_PRODUCT_DEFINE(sample_product, CONFIG_SAMPLE_APP_PRODUCT_NAME);
+USBD_DESC_SERIAL_NUMBER_DEFINE(sample_sn); // TODO: where does WHID come from?
 
 void main(void)
 {
@@ -321,6 +326,27 @@ void main(void)
 
 	int add_config_result = usbd_add_configuration(&usbd, USBD_SPEED_FS,
 				     &sample_fs_config);
+					 /* doc add string descriptor start */
+	int err = usbd_add_descriptor(&usbd, &sample_lang);
+	if (err) {
+		LOG_ERR("Failed to initialize language descriptor (%d)", err);
+	}
+
+	err = usbd_add_descriptor(&usbd, &sample_mfr);
+	if (err) {
+		LOG_ERR("Failed to initialize manufacturer descriptor (%d)", err);
+	}
+
+	err = usbd_add_descriptor(&usbd, &sample_product);
+	if (err) {
+		LOG_ERR("Failed to initialize product descriptor (%d)", err);
+	}
+
+	err = usbd_add_descriptor(&usbd, &sample_sn);
+	if (err) {
+		LOG_ERR("Failed to initialize SN descriptor (%d)", err);
+		return NULL;
+	}
 	printk("usbd_add_configuration result %d\n", add_config_result);
 	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
 	printk("usbd_register_class result %d\n", register_result);
@@ -345,7 +371,7 @@ void main(void)
 					  .sysex_data_cb = sysex_data_cb,
 					  .sysex_end_cb = sysex_end_cb,
 					  .sysex_start_cb = sysex_start_cb};
-	usb_midi_register_callbacks(&callbacks);
+	usb_midi_init(&callbacks);
 
 	/* Init USB */
 	// int enable_rc = usb_enable(NULL);
