@@ -287,6 +287,8 @@ static void usb_midi_tx_done_cb()
 }
 
 /****************** Sample app ******************/
+
+#ifdef CONFIG_USB_DEVICE_STACK_NEXT
 USBD_DESC_CONFIG_DEFINE(fs_cfg_desc, "FS Configuration");
 USBD_DESC_CONFIG_DEFINE(hs_cfg_desc, "HS Configuration");
 
@@ -317,6 +319,8 @@ USBD_DESC_MANUFACTURER_DEFINE(sample_mfr, CONFIG_SAMPLE_APP_MANUFACTURER_NAME);
 USBD_DESC_PRODUCT_DEFINE(sample_product, CONFIG_SAMPLE_APP_PRODUCT_NAME);
 USBD_DESC_SERIAL_NUMBER_DEFINE(sample_sn); // TODO: where does WHID come from?
 
+#endif // CONFIG_USB_DEVICE_STACK_NEXT
+
 int main(void)
 {
 #if defined(CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT) || NRF_CLOCK_HAS_HFCLK192M
@@ -325,9 +329,8 @@ int main(void)
 #endif
 	init_leds();
 	init_button();
-
 	
-	
+#ifdef CONFIG_USB_DEVICE_STACK_NEXT
 	int add_config_result = usbd_add_configuration(&usbd, USBD_SPEED_FS,
 				     &sample_fs_config);
 					 /* doc add string descriptor start */
@@ -363,6 +366,7 @@ int main(void)
 	printk("usbd_init result %d\n", init_result);
 	int enable_result = usbd_enable(&usbd);
 	printk("usbd_enable result %d\n", enable_result);
+#endif // CONFIG_USB_DEVICE_STACK_NEXT
 
 	k_work_init(&button_press_work, on_button_press);
 	k_work_init(&event_tx_work, on_event_tx);
@@ -378,9 +382,11 @@ int main(void)
 					  .sysex_start_cb = sysex_start_cb};
 	usb_midi_init(&callbacks);
 
+#ifdef CONFIG_USB_DEVICE_STACK
 	/* Init USB */
-	// int enable_rc = usb_enable(NULL);
-	// __ASSERT(enable_rc == 0, "Failed to enable USB");
+	int enable_rc = usb_enable(NULL);
+	__ASSERT(enable_rc == 0, "Failed to enable USB");
+#endif
 
 	/* Send MIDI messages periodically */
 	while (1) {

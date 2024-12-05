@@ -26,7 +26,7 @@ struct usb_midi_cb_t {
 };
 
 /**
- * TODO
+ * TODO: rename to register_callbacks?
  */
 void usb_midi_init(struct usb_midi_cb_t* handlers);
 

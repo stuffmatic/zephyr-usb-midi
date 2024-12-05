@@ -56,7 +56,7 @@ static void availability_changed(int is_available) {
 	usb_midi_is_available = is_available;
 }
 
-void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
+void usb_midi_init(struct usb_midi_cb_t *cb)
 {
 	user_callbacks.available_cb = cb->available_cb;
 	user_callbacks.midi_message_cb = cb->midi_message_cb;
