@@ -93,15 +93,15 @@ static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 					      .sysex_start_cb = NULL};
 
 // TODO: needed?
-#define USB_MIDI_VENDOR_REQ_OUT 0x5b
-#define USB_MIDI_VENDOR_REQ_IN	0x5c
+//#define USB_MIDI_VENDOR_REQ_OUT 0x5b
+//#define USB_MIDI_VENDOR_REQ_IN	0x5c
 
 // #define LB_ISO_EP_MPS			256
 // #define LB_ISO_EP_INTERVAL		1
 
 /* Make supported vendor request visible for the device stack */
-static const struct usbd_cctx_vendor_req usb_midi_vregs =
-	USBD_VENDOR_REQ(USB_MIDI_VENDOR_REQ_OUT, USB_MIDI_VENDOR_REQ_IN);
+// static const struct usbd_cctx_vendor_req usb_midi_vregs =
+//	USBD_VENDOR_REQ(USB_MIDI_VENDOR_REQ_OUT, USB_MIDI_VENDOR_REQ_IN);
 
 /*
 static void availability_changed(int is_available) {
@@ -362,12 +362,12 @@ int usb_midi_control_to_dev_cb(struct usbd_class_data *const c_data,
 		return 0;
 	}
 
-	if (setup->bRequest == USB_MIDI_VENDOR_REQ_OUT) {
+	/*if (setup->bRequest == USB_MIDI_VENDOR_REQ_OUT) {
 		LOG_DBG("Host-to-Device, wLength %u | %zu", setup->wLength, buf->len);
 		// 	MIN(sizeof(lb_buf), buf->len));
 		// memcpy(lb_buf, buf->data, MIN(sizeof(lb_buf), buf->len));
 		return 0;
-	}
+	} */
 
 	LOG_ERR("Class request 0x%x not supported", setup->bRequest);
 	errno = -ENOTSUP;
@@ -385,14 +385,14 @@ int usb_midi_control_to_host_cb(struct usbd_class_data *const c_data,
 		return 0;
 	}
 
-	if (setup->bRequest == USB_MIDI_VENDOR_REQ_IN) {
+	/*if (setup->bRequest == USB_MIDI_VENDOR_REQ_IN) {
 		// net_buf_add_mem(buf, lb_buf,
 		//		MIN(sizeof(lb_buf), setup->wLength));
 
 		LOG_DBG("Device-to-Host, wLength %u | %zu", setup->wLength, setup->wLength);
 
 		return 0;
-	}
+	} */
 
 	LOG_ERR("Class request 0x%x not supported", setup->bRequest);
 	errno = -ENOTSUP;
