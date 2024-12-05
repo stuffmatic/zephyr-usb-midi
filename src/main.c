@@ -105,9 +105,11 @@ void on_event_tx(struct k_work *item)
 	if (sample_app_state.usb_midi_is_available && !sample_app_state.sysex_tx_in_progress) {
 		uint8_t note = CONFIG_TX_PERIODIC_NOTE_NUMBER;
 		uint8_t vel = CONFIG_TX_PERIODIC_NOTE_VELOCITY;
-		uint8_t msg[3] = {sample_app_state.tx_note_off ? 0x80 : 0x90, note, vel };
+		for (int i = 0; i < 3; i++) {
+			uint8_t msg[3] = {sample_app_state.tx_note_off ? 0x80 : 0x90, note + 2 * i, vel };
+			usb_midi_tx(0, msg);
+		}
 		flash_tx_led();
-		usb_midi_tx(0, msg);
 		sample_app_state.tx_note_off = !sample_app_state.tx_note_off;
 	}
 }

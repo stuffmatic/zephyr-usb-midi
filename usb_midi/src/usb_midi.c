@@ -1,4 +1,5 @@
 #include <zephyr/init.h>
+#include <zephyr/sys/ring_buffer.h>
 #include <zephyr/usb/usbd.h>
 #include <zephyr/drivers/usb/udc.h>
 #include <usb_midi/usb_midi.h>
@@ -14,7 +15,6 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 		packet.bytes[1], packet.bytes[2], packet.bytes[3], packet.cable_num, packet.cin,   \
 		packet.num_midi_bytes)
 
-// USBD_CLASS_DESCR_DEFINE(primary, 0)
 static struct usbd_class_data usb_midi; // TODO: remove
 
 struct usb_midi_config usb_midi_config_data = {
@@ -70,13 +70,23 @@ const static struct usb_desc_header *xxx[] = {
 };
 
 struct usb_midi_data {
-	// struct usb_midi_config *const desc;
+	// re-usable buffer used for receiving data
+	struct net_buf* rx_buf;
+	// re-usable buffer used for sending data
+	struct net_buf* tx_buf;
+	// fifo used to enqueue packets to send at the next SOF event
+	struct ring_buf tx_fifo;
 	const struct usb_desc_header **const fs_desc;
 	const struct usb_desc_header **const hs_desc;
 };
 
-static struct usb_midi_data usb_midi_data = {
-	// .desc = &usb_midi_config_data,
+static uint8_t tx_fifo_data[CONFIG_USB_MIDI_TX_FIFO_SIZE];
+static struct usb_midi_data usb_midi_class_data = {
+	.tx_fifo = {
+		.buffer = tx_fifo_data,
+		.size = CONFIG_USB_MIDI_TX_FIFO_SIZE
+	},
+	.rx_buf = NULL,
 	.fs_desc = &xxx[0],
 	.hs_desc = &xxx[0],
 };
@@ -100,16 +110,16 @@ int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	{
 		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d",
 		midi_bytes[0], midi_bytes[1], midi_bytes[2], error); return -EINVAL;
+		return error;
 	}
-	// LOG_DBG_PACKET(packet);
-	// int write_result = usb_write(0x81, packet.bytes, 4, NULL);
-	// return write_result; */
-	
-	struct net_buf* buf = usbd_ep_buf_alloc(&usb_midi, 0x81, 4);
-	int add_result = net_buf_add_mem(buf, packet.bytes, 4);
-	// LOG_DBG("add_result %d", add_result);
-	int enq_result = usbd_ep_enqueue(&usb_midi, buf);
-	// LOG_DBG("enq_result %d", enq_result);
+	LOG_DBG_PACKET(packet);
+	struct usb_midi_data *data = &usb_midi_class_data;
+	int put_result = ring_buf_put(&data->tx_fifo, packet.bytes, 4);
+	if (put_result != 4) {
+		LOG_WRN("Failed to add packet to tx fifo");
+		return -1; // TODO: proper error
+	}
+	return 0;
 }
 
 int usb_midi_tx_buffer_is_full()
@@ -170,24 +180,36 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 {
 	struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
 	struct udc_buf_info *bi = NULL;
-
-	struct usb_midi_packet_t packet;
-	usb_midi_packet_from_usb_bytes(buf->data, &packet);
-	LOG_DBG_PACKET(packet);
-
 	bi = (struct udc_buf_info *)net_buf_user_data(buf);
 	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
-	// usbd_ep_buf_free(uds_ctx, buf);
 
+	// TODO: check error before doing this?
+	// TODO: don't hardcode endpoint addresses
+	if (bi->ep == 0x01) {
+		// received data. TODO: handle more than 4 bytes
+		struct usb_midi_packet_t packet;
+		__ASSERT(buf->size % 4 == 0, "ep buf should only contain 4 byte packets");
+		int decode_result = usb_midi_packet_from_usb_bytes(buf->data, &packet);
+		if (decode_result == USB_MIDI_SUCCESS) {
+			struct usb_midi_parse_cb_t parse_cb = {
+					.message_cb = user_callbacks.midi_message_cb,
+					.sysex_data_cb = user_callbacks.sysex_data_cb,
+					.sysex_end_cb = user_callbacks.sysex_end_cb,
+					.sysex_start_cb = user_callbacks.sysex_start_cb};
+			usb_midi_parse_packet(packet.bytes, &parse_cb);
+		} else {
+			LOG_WRN("decoding USB MIDI packet failed with error %d", decode_result);
+		}
+		LOG_DBG_PACKET(packet);
+		net_buf_reset(buf);
+		int r = usbd_ep_enqueue(c_data, buf);
+	} else if (bi->ep == 0x81) {
+		// sent data
+		net_buf_reset(buf);
+		// int r = usbd_ep_enqueue(c_data, buf);
+	}
 
-	// LOG_DBG("usb_midi_request_cb");
-	// TODO: move to function
-	struct net_buf* next_buf = buf; // usbd_ep_buf_alloc(c_data, 0x01, 4);
-	net_buf_reset(next_buf);
-	int r = usbd_ep_enqueue(c_data, next_buf);
-	// printk("usbd_ep_enqueue, result %d\n", r);
 	return 0;
-	// return usbd_ep_buf_free(uds_ctx, buf);
 }
 
 /** USB power management handler suspended */
@@ -207,6 +229,18 @@ static int sof_debug_ctr = 0;
 void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 {
 	// LOG_DBG("Instance %p", c_data);
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
+	if (!ring_buf_is_empty(&data->tx_fifo)) {
+		while (!ring_buf_is_empty(&data->tx_fifo)) {
+			// Read 4 byte packets from the tx fifo and put them into 
+			// the tx endpoint buffer
+			uint8_t packet_bytes[4];
+			int peek_result = ring_buf_get(&data->tx_fifo, packet_bytes, 4);
+			net_buf_add_mem(data->tx_buf, packet_bytes, 4);
+			// TODO: peek and then read if net_buf_add_mem succeeds
+		}
+		usbd_ep_enqueue(c_data, data->tx_buf);
+	}
 }
 
 /** Class associated configuration is selected */
@@ -216,17 +250,48 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 	if (user_callbacks.available_cb) {
 		user_callbacks.available_cb(1);
 	}
-	// TODO: move to function
-	// TODO: leaks one buffer per enable
-	struct net_buf* buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
-	int r = usbd_ep_enqueue(c_data, buf);
-	printk("usbd_ep_enqueue, result %d\n", r);
+	
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
+	// TODO: don't hardcode endpoint addresses?
+	if (data->rx_buf == NULL) {
+		// Allocate buffer for receiving data
+		data->rx_buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
+		// Enqueue the rx buffer. This signals to the stack that 
+		// we're ready to receive data. If this is not done,
+		// nothing will be received.
+		int enqueue_result = usbd_ep_enqueue(c_data, data->rx_buf);
+		if (enqueue_result != 0) {
+			LOG_ERR("Failed to enqueue rx buf with error %d", enqueue_result);
+		}
+	}
+	if (data->tx_buf == NULL) {
+		data->tx_buf = usbd_ep_buf_alloc(c_data, 0x81, 64);
+	}
 }
 
 /** Class associated configuration is disabled */
 void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
+	if (data->tx_buf) {
+		int free_result = usbd_ep_buf_free(c_data->uds_ctx, data->tx_buf);
+		if (free_result != 0) {
+			LOG_ERR("Failed to free tx ep buf with error %d", free_result);
+		} else {
+			data->tx_buf = NULL;
+		}
+	}
+
+	if (data->rx_buf) {
+		int free_result = usbd_ep_buf_free(c_data->uds_ctx, data->rx_buf);
+		if (free_result != 0) {
+			LOG_ERR("Failed to free rx ep buf with error %d", free_result);
+		} else {
+			data->rx_buf = NULL;
+		}
+	}
+
 	if (user_callbacks.available_cb) {
 		user_callbacks.available_cb(0);
 	}
@@ -259,7 +324,7 @@ void *usb_midi_get_desc_cb(struct usbd_class_data *const c_data, const enum usbd
 	return data->fs_desc;
 }
 
-struct usbd_class_api usb_midi_api = {
+struct usbd_class_api usb_midi_class_api = {
 	.feature_halt = usb_midi_feature_halt_cb,
 	.update = usb_midi_update_cb, 
 	.request = usb_midi_request_cb,
@@ -273,7 +338,7 @@ struct usbd_class_api usb_midi_api = {
 	.get_desc = usb_midi_get_desc_cb
 };
 
-USBD_DEFINE_CLASS(usb_midi, &usb_midi_api, &usb_midi_data, NULL);
+USBD_DEFINE_CLASS(usb_midi, &usb_midi_class_api, &usb_midi_class_data, NULL);
 
 void usb_midi_init(struct usb_midi_cb_t *cb)
 {
