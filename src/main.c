@@ -293,6 +293,7 @@ USBD_DESC_CONFIG_DEFINE(fs_cfg_desc, "FS Configuration");
 USBD_DESC_CONFIG_DEFINE(hs_cfg_desc, "HS Configuration");
 
 /* doc configuration instantiation start */
+// TODO: set remote wakeup and self powered somwhere
 static const uint8_t attributes = (IS_ENABLED(CONFIG_SAMPLE_USBD_SELF_POWERED) ?
 				   USB_SCD_SELF_POWERED : 0) |
 				  (IS_ENABLED(CONFIG_SAMPLE_USBD_REMOTE_WAKEUP) ?

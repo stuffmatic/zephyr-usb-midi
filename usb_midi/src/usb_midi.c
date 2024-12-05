@@ -215,13 +215,13 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 /** USB power management handler suspended */
 void usb_midi_suspended_cb(struct usbd_class_data *const c_data)
 {
-	LOG_DBG("Instance %p", c_data);
+	LOG_INF("Instance %p", c_data);
 }
 
 /** USB power management handler resumed */
 void usb_midi_resumed_cb(struct usbd_class_data *const c_data)
 {
-	LOG_DBG("Instance %p", c_data);
+	LOG_INF("Instance %p", c_data);
 }
 
 /** Start of Frame */
@@ -248,6 +248,7 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 	if (user_callbacks.available_cb) {
+		LOG_INF("USB MIDI became available");
 		user_callbacks.available_cb(1);
 	}
 	
@@ -293,6 +294,7 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 	}
 
 	if (user_callbacks.available_cb) {
+		LOG_INF("USB MIDI became unavailable");
 		user_callbacks.available_cb(0);
 	}
 }
@@ -300,14 +302,14 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 /** Initialization of the class implementation */
 int usb_midi_init_cb(struct usbd_class_data *const c_data)
 {
-	LOG_DBG("Instance %p", c_data);
+	LOG_INF("Instance %p", c_data);
 	return 0;
 }
 
 /** Shutdown of the class implementation */
 void usb_midi_shutdown_cb(struct usbd_class_data *const c_data)
 {
-	LOG_DBG("Instance %p", c_data);
+	LOG_INF("Instance %p", c_data);
 }
  
 /** Get function descriptor based on speed parameter */
