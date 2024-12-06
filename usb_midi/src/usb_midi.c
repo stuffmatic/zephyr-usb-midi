@@ -234,17 +234,24 @@ void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 	// LOG_DBG("Instance %p", c_data);
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	if (!ring_buf_is_empty(&data->tx_fifo)) {
+		int buf_capacity = 64;
+		struct net_buf* buf = usbd_ep_buf_alloc(c_data, 0x81, buf_capacity);
+		int num_bytes_added = 0;
 		while (!ring_buf_is_empty(&data->tx_fifo)) {
 			// Read 4 byte packets from the tx fifo and put them into 
-			// the tx endpoint buffer
-			uint8_t packet_bytes[4];
-			int peek_result = ring_buf_get(&data->tx_fifo, packet_bytes, 4);
-			struct net_buf* buf = usbd_ep_buf_alloc(c_data, 0x81, 4);
-			net_buf_add_mem(buf, packet_bytes, 4);
-			usbd_ep_enqueue(c_data, buf);
-			// TODO: peek and then get only if net_buf_add_mem succeeds
-			// TODO: how to maximize tx througput?
+			// the tx endpoint buffer.
+			// TODO: maximize throughput further? usbd_ep_enqueue more than once?
+			if (num_bytes_added + 4 < buf_capacity) {
+				uint8_t packet_bytes[4];
+				int peek_result = ring_buf_get(&data->tx_fifo, packet_bytes, 4);
+				net_buf_add_mem(buf, packet_bytes, 4);
+				num_bytes_added += 4;
+			} else {
+				// tx buffer is full. continue reading from fifo at a future sof event
+				break;
+			}
 		}
+		usbd_ep_enqueue(c_data, buf);
 	}
 }
 
