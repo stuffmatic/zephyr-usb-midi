@@ -71,9 +71,9 @@ const static struct usb_desc_header *xxx[] = {
 
 struct usb_midi_data {
 	// re-usable buffer used for receiving data
-	struct net_buf* rx_buf;
+	// struct net_buf* rx_buf;
 	// re-usable buffer used for sending data
-	struct net_buf* tx_buf;
+	// struct net_buf* tx_buf;
 	// fifo used to enqueue packets to send at the next SOF event
 	struct ring_buf tx_fifo;
 	const struct usb_desc_header **const fs_desc;
@@ -86,7 +86,7 @@ static struct usb_midi_data usb_midi_class_data = {
 		.buffer = tx_fifo_data,
 		.size = CONFIG_USB_MIDI_TX_FIFO_SIZE
 	},
-	.rx_buf = NULL,
+	// .rx_buf = NULL,
 	.fs_desc = &xxx[0],
 	.hs_desc = &xxx[0],
 };
@@ -185,7 +185,8 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 
 	// TODO: check error before doing this?
 	// TODO: don't hardcode endpoint addresses
-	if (bi->ep == 0x01) {
+
+	if (USB_EP_DIR_IS_OUT(bi->ep)) {
 		// received data. TODO: handle more than 4 bytes
 		struct usb_midi_packet_t packet;
 		__ASSERT(buf->size % 4 == 0, "ep buf should only contain 4 byte packets");
@@ -201,13 +202,16 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 			LOG_WRN("decoding USB MIDI packet failed with error %d", decode_result);
 		}
 		LOG_DBG_PACKET(packet);
-		net_buf_reset(buf);
-		int r = usbd_ep_enqueue(c_data, buf);
-	} else if (bi->ep == 0x81) {
-		// sent data
-		net_buf_reset(buf);
+		// net_buf_reset(buf);
+		struct net_buf* next_buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
+		int r = usbd_ep_enqueue(c_data, next_buf);
+	} else {
+		// sent data to host
+		// net_buf_reset(buf);
 		// int r = usbd_ep_enqueue(c_data, buf);
 	}
+
+	usbd_ep_buf_free(uds_ctx, buf);
 
 	return 0;
 }
@@ -225,7 +229,6 @@ void usb_midi_resumed_cb(struct usbd_class_data *const c_data)
 }
 
 /** Start of Frame */
-static int sof_debug_ctr = 0;
 void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 {
 	// LOG_DBG("Instance %p", c_data);
@@ -236,10 +239,12 @@ void usb_midi_sof_cb(struct usbd_class_data *const c_data)
 			// the tx endpoint buffer
 			uint8_t packet_bytes[4];
 			int peek_result = ring_buf_get(&data->tx_fifo, packet_bytes, 4);
-			net_buf_add_mem(data->tx_buf, packet_bytes, 4);
-			// TODO: peek and then read if net_buf_add_mem succeeds
+			struct net_buf* buf = usbd_ep_buf_alloc(c_data, 0x81, 4);
+			net_buf_add_mem(buf, packet_bytes, 4);
+			usbd_ep_enqueue(c_data, buf);
+			// TODO: peek and then get only if net_buf_add_mem succeeds
+			// TODO: how to maximize tx througput?
 		}
-		usbd_ep_enqueue(c_data, data->tx_buf);
 	}
 }
 
@@ -254,20 +259,20 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 	
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	// TODO: don't hardcode endpoint addresses?
-	if (data->rx_buf == NULL) {
+	//if (data->rx_buf == NULL) {
 		// Allocate buffer for receiving data
-		data->rx_buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
+		struct net_buf* rx_buf = usbd_ep_buf_alloc(c_data, 0x01, 64);
 		// Enqueue the rx buffer. This signals to the stack that 
 		// we're ready to receive data. If this is not done,
 		// nothing will be received.
-		int enqueue_result = usbd_ep_enqueue(c_data, data->rx_buf);
+		int enqueue_result = usbd_ep_enqueue(c_data, rx_buf);
 		if (enqueue_result != 0) {
 			LOG_ERR("Failed to enqueue rx buf with error %d", enqueue_result);
 		}
-	}
-	if (data->tx_buf == NULL) {
-		data->tx_buf = usbd_ep_buf_alloc(c_data, 0x81, 64);
-	}
+	//}
+	/*if (data->tx_buf == NULL) {
+		// data->tx_buf = usbd_ep_buf_alloc(c_data, 0x81, 64);
+	} */
 }
 
 /** Class associated configuration is disabled */
@@ -275,7 +280,7 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 {
 	LOG_DBG("Instance %p", c_data);
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
-	if (data->tx_buf) {
+	/* if (data->tx_buf) {
 		int free_result = usbd_ep_buf_free(c_data->uds_ctx, data->tx_buf);
 		if (free_result != 0) {
 			LOG_ERR("Failed to free tx ep buf with error %d", free_result);
@@ -291,7 +296,9 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 		} else {
 			data->rx_buf = NULL;
 		}
-	}
+	} */
+
+	ring_buf_reset(&data->tx_fifo);
 
 	if (user_callbacks.available_cb) {
 		LOG_INF("USB MIDI became unavailable");
