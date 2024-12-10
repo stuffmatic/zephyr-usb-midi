@@ -33,8 +33,8 @@ static void test_packet_from_midi_bytes()
 		uint8_t msg[3] = {
 			high_nibble << 4, 0x12, 0x23
 		};
-		enum usb_midi_error_t result = usb_midi_packet_from_midi_bytes(msg, cable_num, &packet);
-		assert(result == USB_MIDI_SUCCESS, "Parsing valid channel message should succeed");
+		enum usb_midi_packet_error_t result = usb_midi_packet_from_midi_bytes(msg, cable_num, &packet);
+		assert(result == USB_MIDI_PACKET_SUCCESS, "Parsing valid channel message should succeed");
 		assert(packet.cin == high_nibble, "Channel message CIN should equal high status byte nibble");
 		assert(packet.cable_num == cable_num, "Unexpected USB MIDI packet cable number");
 		if (high_nibble == 0xc || high_nibble == 0xd) {
@@ -70,8 +70,8 @@ static void test_packet_from_midi_bytes()
 
     uint8_t message_count = sizeof(messages) / 4;
     for (int i = 0; i < message_count; i++) {
-		enum usb_midi_error_t result = usb_midi_packet_from_midi_bytes(messages[i], cable_num, &packet);
-		assert(result == USB_MIDI_SUCCESS, "Parsing valid channel message should succeed");
+		enum usb_midi_packet_error_t result = usb_midi_packet_from_midi_bytes(messages[i], cable_num, &packet);
+		assert(result == USB_MIDI_PACKET_SUCCESS, "Parsing valid channel message should succeed");
 		assert(packet.cin == messages[i][3], "Channel message CIN should equal high status byte nibble");
 		assert(packet.cable_num == cable_num, "Unexpected USB MIDI packet cable number");
     }
@@ -85,8 +85,8 @@ static void test_packet_from_midi_bytes()
     };
     uint8_t invalid_message_count = sizeof(invalid_messages) / 3;
     for (int i = 0; i < invalid_message_count; i++) {
-        enum usb_midi_error_t result = usb_midi_packet_from_midi_bytes(invalid_messages[i], cable_num, &packet);
-	    assert(result == USB_MIDI_ERROR_INVALID_MIDI_MSG,
+        enum usb_midi_packet_error_t result = usb_midi_packet_from_midi_bytes(invalid_messages[i], cable_num, &packet);
+	    assert(result == USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG,
                "Parsing invalid MIDI message should fail");
     }
 }
@@ -172,10 +172,10 @@ static void test_parse_non_sysex() {
 
     for (int i = 0; i < num_messages; i++) {
         struct usb_midi_packet_t packet;
-        enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(messages[i], cable_num, &packet);
+        enum usb_midi_packet_error_t error = usb_midi_packet_from_midi_bytes(messages[i], cable_num, &packet);
         reset_parser_test_state();
         usb_midi_parse_packet(packet.bytes, &parse_cb);
-        assert(error == USB_MIDI_SUCCESS, "usb_midi_packet_from_midi_bytes should not fail for valid non-sysex msg");
+        assert(error == USB_MIDI_PACKET_SUCCESS, "usb_midi_packet_from_midi_bytes should not fail for valid non-sysex msg");
          for (int j = 0; j < packet.num_midi_bytes; j++) {
             assert(parser_test_result.non_sysex_messages[0][j] == messages[i][j],
                   "parsing valid non-sysex packets should not fail");
@@ -198,8 +198,8 @@ static void test_parse_sysex() {
 
     for (int i = 0; i < num_sysex_messages; i++) {
         struct usb_midi_packet_t packet;
-        enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(sysex_messages[i], cable_num, &packet);
-        assert(error == USB_MIDI_SUCCESS, "usb_midi_packet_from_midi_bytes should not fail for valid sysex msg");
+        enum usb_midi_packet_error_t error = usb_midi_packet_from_midi_bytes(sysex_messages[i], cable_num, &packet);
+        assert(error == USB_MIDI_PACKET_SUCCESS, "usb_midi_packet_from_midi_bytes should not fail for valid sysex msg");
         reset_parser_test_state();
         usb_midi_parse_packet(packet.bytes, &parse_cb);
         assert(parser_test_result.num_non_sysex_messages == 0, "");

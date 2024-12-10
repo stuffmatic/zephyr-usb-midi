@@ -3,11 +3,11 @@
 
 #include <stdint.h>
 
-enum usb_midi_error_t {
-	USB_MIDI_SUCCESS = 0,
-	USB_MIDI_ERROR_INVALID_CIN = -1,
-	USB_MIDI_ERROR_INVALID_CABLE_NUM = -2,
-	USB_MIDI_ERROR_INVALID_MIDI_MSG = -3
+enum usb_midi_packet_error_t {
+	USB_MIDI_PACKET_SUCCESS = 0,
+	USB_MIDI_PACKET_ERROR_INVALID_CIN = -1,
+	USB_MIDI_PACKET_ERROR_INVALID_CABLE_NUM = -2,
+	USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG = -3
 };
 
 /* Code Index Numbers. See table 4-1 in the spec. */
@@ -66,7 +66,7 @@ struct usb_midi_parse_cb_t {
 /**
  * Parses a USB MIDI packet and invokes the appropriate callback.
  */
-enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
+enum usb_midi_packet_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 					    struct usb_midi_parse_cb_t *parse_cb);
 
 /* A USB MIDI event packet. See chapter 4 in the spec. */
@@ -77,9 +77,9 @@ struct usb_midi_packet_t {
 	uint8_t num_midi_bytes;
 };
 
-enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
+enum usb_midi_packet_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
 						      struct usb_midi_packet_t *packet);
-enum usb_midi_error_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes,
+enum usb_midi_packet_error_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes,
 						     struct usb_midi_packet_t *packet);
 
 #endif

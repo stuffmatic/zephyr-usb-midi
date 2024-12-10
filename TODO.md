@@ -2,6 +2,8 @@
 * proper zephyr code formating
 * select instead of depends on for kconfig vars?
 * macos resume after sleep sometimes not working (only when logging?)
+* CONFIG_USB_DEVICE_SOF
+* wMaxPacketSize=64 or 512 depending on hs/fs, 
 
 # USB next port
 

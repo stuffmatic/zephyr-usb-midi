@@ -237,39 +237,33 @@ static uint8_t get_next_sysex_tx_byte() {
 
 static void send_next_sysex_chunk() {
 	__ASSERT_NO_MSG(sample_app_state.sysex_tx_in_progress);
-	flash_tx_led();
+
+	// flash_tx_led();
 
 	while (1) {
-		if (usb_midi_tx_buffer_is_full()) {
-			// tx packet is full. send it. 
-			usb_midi_tx_buffer_send();
-			// nothing further for now. wait for tx done callback before
-			// filling the next packet.
-			break;
-		}
-
 		int sysex_msg_size = sample_app_state.sysex_tx_msg_size;
 
 		uint8_t chunk[3] = {0, 0, 0};
+		int chunk_size = 0;
 		for (int i = 0; i < 3; i++) {
 			uint8_t next_sysex_byte = get_next_sysex_tx_byte();
 			chunk[i] = next_sysex_byte;
-			sample_app_state.sysex_tx_byte_count++;
+			chunk_size++;
+			if (sample_app_state.sysex_tx_byte_count == 0) {
+				break;
+			}
 
-			if (sample_app_state.sysex_tx_byte_count == sysex_msg_size) {
+			if (sample_app_state.sysex_tx_byte_count + chunk_size == sysex_msg_size) {
 				break;
 			}
 		}
+		sample_app_state.sysex_tx_byte_count += chunk_size;
 
-		// Enqueue three byte sysex chunk for transmission
-		// TODO: check if this suceeds or not? Currently, this check is not needed
-		// since each MIDI message is put into a 4 byte packet and the tx buffer size
-		// is a multiple of 4. 
-		usb_midi_tx_buffer_add(sample_app_state.sysex_tx_cable_num, chunk);
-
-		if (sample_app_state.sysex_tx_byte_count == sysex_msg_size) {
+		enum usb_midi_error_t tx_result = usb_midi_tx(sample_app_state.sysex_tx_cable_num, chunk);
+		if (tx_result == USB_MIDI_TX_FIFO_FULL) {
+			break;
+		} else if (sample_app_state.sysex_tx_byte_count == sysex_msg_size) {
 			// No more data to add to tx packet. Send it, then we're done.
-			usb_midi_tx_buffer_send();
 			flash_tx_led();
 			u_int64_t dt_ms = k_uptime_get() - sample_app_state.sysex_tx_start_time;
 			log_sysex_transfer_time(1, sample_app_state.sysex_tx_cable_num, sysex_msg_size, dt_ms);
@@ -334,7 +328,7 @@ int main(void)
 #ifdef CONFIG_USB_DEVICE_STACK_NEXT
 	int add_config_result = usbd_add_configuration(&usbd, USBD_SPEED_FS,
 				     &sample_fs_config);
-					 /* doc add string descriptor start */
+					 
 	printk("usbd_add_configuration result %d\n", add_config_result);
 	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
 	printk("usbd_register_class result %d\n", register_result);
@@ -381,7 +375,7 @@ int main(void)
 					  .sysex_data_cb = sysex_data_cb,
 					  .sysex_end_cb = sysex_end_cb,
 					  .sysex_start_cb = sysex_start_cb};
-	usb_midi_init(&callbacks);
+	usb_midi_register_callbacks(&callbacks);
 
 #ifdef CONFIG_USB_DEVICE_STACK
 	/* Init USB */

@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 
+enum usb_midi_error_t {
+    USB_MIDI_SUCCESS = 0,
+    /* USB MIDI device is not connected */
+    USB_MIDI_NOT_AVAILABLE = 1,
+    USB_MIDI_TX_FIFO_FULL = 2,
+    USB_MIDI_INVALID_DATA = 3,  
+};
+
 /** A function to call when the USB MIDI device becomes available/unavailable. */
 typedef void (*usb_midi_available_cb_t)(int is_available);
 /** A function to call when a USB MIDI packet has just been sent. */
@@ -26,9 +34,9 @@ struct usb_midi_cb_t {
 };
 
 /**
- * TODO: rename to register_callbacks?
+ * 
  */
-void usb_midi_init(struct usb_midi_cb_t* handlers);
+void usb_midi_register_callbacks(struct usb_midi_cb_t* handlers);
 
 /**
  * Send a MIDI message with a given cable number. The event must be 1, 2 or 3 
@@ -50,9 +58,10 @@ void usb_midi_init(struct usb_midi_cb_t* handlers);
  * @param cable_number Send the event on the virtual cable with this number.
  * Must be smaller than the number of outputs.
  * @param midi_bytes The MIDI bytes to send.
- * @return 0 on success, a non-zero number on failure.
+ * @return
+ * 
  */
-int usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
+enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
 
 /**
  * Enqueue a message for transmission. Used to send more than one
@@ -60,18 +69,18 @@ int usb_midi_tx(uint8_t cable_number, uint8_t* midi_bytes);
  * @return 0 if the message was enqueued, otherwise a non-zero number indicating that
  * usb_midi_tx_buffer_send should be called.
  */
-int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes);
+// int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes);
 
 /**
  * Indicates if more messages can be enqueued for transmission.
  * @return Zero if more messages can be enqueued. A non-zero number indicates that 
  * usb_midi_tx_buffer_send should be called.
  */
-int usb_midi_tx_buffer_is_full();
+// int usb_midi_tx_buffer_is_full();
 
 /**
  * Send enqueued messages, if any, in a single USB packet.
  */
-int usb_midi_tx_buffer_send();
+// int usb_midi_tx_buffer_send();
 
 #endif

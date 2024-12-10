@@ -5,7 +5,7 @@
 #define IS_DATA_BYTE(b) (b < 0x80)
 #define IS_STATUS_BYTE(b) (b >= 0x80)
 
-static enum usb_midi_error_t channel_msg_cin(uint8_t first_byte, uint8_t *cin)
+static enum usb_midi_packet_error_t channel_msg_cin(uint8_t first_byte, uint8_t *cin)
 {
 	uint8_t high_nibble = first_byte >> 4;
 
@@ -25,14 +25,14 @@ static enum usb_midi_error_t channel_msg_cin(uint8_t first_byte, uint8_t *cin)
 		break;
 	default:
 		/* Invalid status byte */
-		return USB_MIDI_ERROR_INVALID_MIDI_MSG;
+		return USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG;
 	}
 
 	/* Valid status byte */
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }
 
-static enum usb_midi_error_t non_sysex_system_msg_cin(uint8_t first_byte, uint8_t *cin)
+static enum usb_midi_packet_error_t non_sysex_system_msg_cin(uint8_t first_byte, uint8_t *cin)
 {
 	switch (first_byte) {
 	case 0xf1: /* MIDI Time Code Quarter Frame */
@@ -59,14 +59,14 @@ static enum usb_midi_error_t non_sysex_system_msg_cin(uint8_t first_byte, uint8_
 		break;
 	default:
 		/* Invalid status byte */
-		return USB_MIDI_ERROR_INVALID_MIDI_MSG;
+		return USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG;
 	}
 
 	/* Valid status byte */
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }
 
-static enum usb_midi_error_t sysex_msg_cin(uint8_t *midi_bytes, uint8_t *cin)
+static enum usb_midi_packet_error_t sysex_msg_cin(uint8_t *midi_bytes, uint8_t *cin)
 {
 	int is_data_byte[3] = {IS_DATA_BYTE(midi_bytes[0]), IS_DATA_BYTE(midi_bytes[1]), IS_DATA_BYTE(midi_bytes[2])};
 
@@ -101,11 +101,11 @@ static enum usb_midi_error_t sysex_msg_cin(uint8_t *midi_bytes, uint8_t *cin)
 		*cin = USB_MIDI_CIN_SYS_COMMON_OR_SYSEX_END_1BYTE;
 	} else {
 		/* Invalid sysex sequence */
-		return USB_MIDI_ERROR_INVALID_MIDI_MSG;
+		return USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG;
 	}
 
 	/* Valid sysex sequence */
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }
 
 static uint8_t num_midi_bytes_for_cin(uint8_t cin)
@@ -128,7 +128,7 @@ static uint8_t num_midi_bytes_for_cin(uint8_t cin)
 	}
 }
 
-enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
+enum usb_midi_packet_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8_t cable_num,
 						      struct usb_midi_packet_t *packet)
 {
 	/* Building a USB MIDI packet from a MIDI message amounts to determining the code
@@ -177,26 +177,26 @@ enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8
 	 */
 
 	if (cable_num >= 16) {
-		return USB_MIDI_ERROR_INVALID_CABLE_NUM;
+		return USB_MIDI_PACKET_ERROR_INVALID_CABLE_NUM;
 	}
 
 	packet->cable_num = cable_num;
 	packet->cin = 0;
 	packet->num_midi_bytes = 0;
 
-	enum usb_midi_error_t cin_error = channel_msg_cin(midi_bytes[0], &packet->cin);
-	if (cin_error != USB_MIDI_SUCCESS) {
+	enum usb_midi_packet_error_t cin_error = channel_msg_cin(midi_bytes[0], &packet->cin);
+	if (cin_error != USB_MIDI_PACKET_SUCCESS) {
 		cin_error = non_sysex_system_msg_cin(midi_bytes[0], &packet->cin);
 	}
-	if (cin_error != USB_MIDI_SUCCESS) {
+	if (cin_error != USB_MIDI_PACKET_SUCCESS) {
 		cin_error = sysex_msg_cin(midi_bytes, &packet->cin);
 	}
 
 	packet->num_midi_bytes = num_midi_bytes_for_cin(packet->cin);
 
-	if (cin_error != USB_MIDI_SUCCESS || packet->num_midi_bytes == 0) {
+	if (cin_error != USB_MIDI_PACKET_SUCCESS || packet->num_midi_bytes == 0) {
 		/* Invalid MIDI message. */
-		return USB_MIDI_ERROR_INVALID_MIDI_MSG;
+		return USB_MIDI_PACKET_ERROR_INVALID_MIDI_MSG;
 	}
 
 	/* Put cable number and CIN in packet byte 0 */
@@ -211,10 +211,10 @@ enum usb_midi_error_t usb_midi_packet_from_midi_bytes(uint8_t *midi_bytes, uint8
 	}
 
 	/* No errors */
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }
 
-enum usb_midi_error_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes,
+enum usb_midi_packet_error_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes,
 						     struct usb_midi_packet_t *packet)
 {
 	/* Parsing a USB MIDI packet amounts to deriving the number of MIDI
@@ -233,19 +233,19 @@ enum usb_midi_error_t usb_midi_packet_from_usb_bytes(uint8_t *packet_bytes,
 	packet->num_midi_bytes = num_midi_bytes_for_cin(packet->cin);
 
 	if (packet->num_midi_bytes == 0) {
-		return USB_MIDI_ERROR_INVALID_CIN;
+		return USB_MIDI_PACKET_ERROR_INVALID_CIN;
 	}
 
 	/* No errors */
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }
 
-enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
+enum usb_midi_packet_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 					    struct usb_midi_parse_cb_t *parse_cb)
 {
 	struct usb_midi_packet_t packet;
-	enum usb_midi_error_t rc = usb_midi_packet_from_usb_bytes(packet_bytes, &packet);
-	if (rc != USB_MIDI_SUCCESS) {
+	enum usb_midi_packet_error_t rc = usb_midi_packet_from_usb_bytes(packet_bytes, &packet);
+	if (rc != USB_MIDI_PACKET_SUCCESS) {
 		return rc;
 	}
 
@@ -378,8 +378,8 @@ enum usb_midi_error_t usb_midi_parse_packet(uint8_t *packet_bytes,
 	}
 
 	default:
-		return USB_MIDI_ERROR_INVALID_CIN;
+		return USB_MIDI_PACKET_ERROR_INVALID_CIN;
 	}
 
-	return USB_MIDI_SUCCESS;
+	return USB_MIDI_PACKET_SUCCESS;
 }

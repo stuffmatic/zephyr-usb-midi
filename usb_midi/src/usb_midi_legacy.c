@@ -1,5 +1,6 @@
 #include <zephyr/init.h>
 #include <zephyr/usb/usb_device.h>
+#include <zephyr/sys/ring_buffer.h>
 #include <usb_descriptor.h>
 #include <usb_midi/usb_midi.h>
 #include "usb_midi_types.h"
@@ -12,6 +13,14 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 #define LOG_DBG_PACKET(packet) LOG_DBG("%02x %02x %02x %02x | cable %02x | CIN %01x | %d MIDI bytes", \
 									   packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3],            \
 									   packet.cable_num, packet.cin, packet.num_midi_bytes)
+
+#ifdef CONFIG_USB_DEVICE_SOF
+static uint8_t tx_fifo_data[CONFIG_USB_MIDI_TX_FIFO_SIZE];
+static struct ring_buf tx_fifo = {
+	.buffer = tx_fifo_data, 
+	.size = CONFIG_USB_MIDI_TX_FIFO_SIZE
+};
+#endif
 
 USBD_CLASS_DESCR_DEFINE(primary, 0)
 struct usb_midi_config usb_midi_config_data = {
@@ -28,8 +37,8 @@ struct usb_midi_config usb_midi_config_data = {
 	.out_ep = INIT_OUT_EP,
 	.out_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_INPUTS, .BaAssocJackID = {LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + CONFIG_USB_MIDI_NUM_OUTPUTS)}}};
 
-static int temp_tx_buffer_size = 0;
-static uint8_t temp_tx_buffer[EP_MAX_PACKET_SIZE];
+// static int temp_tx_buffer_size = 0;
+// static uint8_t temp_tx_buffer[USB_MIDI_EP_MAX_PACKET_SIZE];
 
 static int usb_midi_is_available = false;
 static struct usb_midi_cb_t user_callbacks = {
@@ -48,7 +57,7 @@ static void availability_changed(int is_available) {
 	LOG_INF("device became %s ", is_available ? "available" : "unavailable");
 
 	if (is_available) {
-		temp_tx_buffer_size = 0;
+		ring_buf_reset(&tx_fifo);
 	}
 	if (user_callbacks.available_cb) {
 		user_callbacks.available_cb(is_available);
@@ -79,9 +88,9 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 				break;
 			}
 			struct usb_midi_packet_t packet;
-			enum usb_midi_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
+			enum usb_midi_packet_error_t error = usb_midi_packet_from_usb_bytes(buf, &packet);
 
-			if (error != USB_MIDI_SUCCESS)
+			if (error != USB_MIDI_PACKET_SUCCESS)
 			{
 				LOG_ERR("Failed to read packet with error %d", error);
 			}
@@ -94,7 +103,7 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 					.sysex_end_cb = user_callbacks.sysex_end_cb,
 					.sysex_start_cb = user_callbacks.sysex_start_cb};
 				error = usb_midi_parse_packet(packet.bytes, &parse_cb);
-				if (error != USB_MIDI_SUCCESS)
+				if (error != USB_MIDI_PACKET_SUCCESS)
 				{
 					LOG_ERR("Failed to parse packet with error %d", error);
 				}
@@ -181,22 +190,31 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	}
 }
 
-int usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
+enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
 	struct usb_midi_packet_t packet;
-	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
-	if (error != USB_MIDI_SUCCESS)
+	enum usb_midi_packet_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
+	if (error != USB_MIDI_PACKET_SUCCESS)
 	{
 		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d", midi_bytes[0], midi_bytes[1], midi_bytes[2], error);
-		return -EINVAL;
+		return USB_MIDI_INVALID_DATA;
 	}
 	LOG_DBG_PACKET(packet);
+#ifdef CONFIG_USB_DEVICE_SOF
+	if (ring_buf_space_get(&tx_fifo) < 4) {
+		return USB_MIDI_TX_FIFO_FULL;
+	}
+	int put_result = ring_buf_put(&tx_fifo, packet.bytes, 4);
+	__ASSERT(put_result == 0, "USB MIDI packet should fit in tx FIFO");
+#else
 	int write_result = usb_write(0x81, packet.bytes, 4, NULL);
-	return write_result;
+	// assume usb_write error is
+	return write_result == 0 ? USB_MIDI_SUCCESS : USB_MIDI_TX_FIFO_FULL;
+#endif
 }
 
-int usb_midi_tx_buffer_is_full() {
-	return temp_tx_buffer_size == EP_MAX_PACKET_SIZE;
+/*int usb_midi_tx_buffer_is_full() {
+	return temp_tx_buffer_size == USB_MIDI_EP_MAX_PACKET_SIZE;
 }
 
 int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes) {
@@ -205,8 +223,8 @@ int usb_midi_tx_buffer_add(uint8_t cable_number, uint8_t* midi_bytes) {
 	}
 
 	struct usb_midi_packet_t packet;
-	enum usb_midi_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
-	if (error != USB_MIDI_SUCCESS)
+	enum usb_midi_packet_error_t error = usb_midi_packet_from_midi_bytes(midi_bytes, cable_number, &packet);
+	if (error != USB_MIDI_PACKET_SUCCESS)
 	{
 		LOG_ERR("Building packet from MIDI bytes %02x %02x %02x failed with error %d", midi_bytes[0], midi_bytes[1], midi_bytes[2], error);
 		return -EINVAL;
@@ -228,7 +246,7 @@ int usb_midi_tx_buffer_send() {
 		return write_result;
 	}
 	return 0;
-}
+} */
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {
 	.usb_device_description = NULL,
