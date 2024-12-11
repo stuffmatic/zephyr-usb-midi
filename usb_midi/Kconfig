@@ -26,6 +26,10 @@ config USB_MIDI_TX_FIFO_SIZE
   int "The size in bytes of the tx fifo"
 	default 128
 
+config USB_MIDI_TX_FIFO_WATER_MARK
+  int "Invoke callback to fill tx fifo when it has at least this much free space"
+	default 64
+
 #
 # Custom input jack names.
 #

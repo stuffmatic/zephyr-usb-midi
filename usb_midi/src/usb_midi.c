@@ -236,8 +236,8 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 		// ...and enqueue next tx endpoint buffer if there is data in the tx FIFO
 		data->has_pending_tx_buffer = enqueue_next_tx_buf(c_data);
 
-		// If there is room in the tx fifo, signal that more data may be added.
-		if (user_callbacks.tx_done_cb && ring_buf_space_get(&data->tx_fifo) > 0) {
+		// If there is enough room in the tx fifo, signal that more data may be added.
+		if (user_callbacks.tx_done_cb && ring_buf_space_get(&data->tx_fifo) >= CONFIG_USB_MIDI_TX_FIFO_WATER_MARK) {
 			user_callbacks.tx_done_cb();
 		}
 	}
