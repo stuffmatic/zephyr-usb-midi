@@ -2,8 +2,6 @@
 * proper zephyr code formating
 * select instead of depends on for kconfig vars?
 * macos resume after sleep sometimes not working (only when logging?)
-* wMaxPacketSize=64 or 512 depending on hs/fs, 
-* hs config only?
 
 # USB next port
 

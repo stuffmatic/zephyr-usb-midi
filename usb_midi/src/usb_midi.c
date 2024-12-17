@@ -24,7 +24,8 @@ static struct usbd_class_data usb_midi; // TODO: remove
 #define INIT_INPUT_JACK_STRING_DESCR(jack_number, _) USBD_DESC_STRING_DEFINE(in_jack_##jack_number##_string_desc, CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME, USBD_DUT_STRING_INTERFACE)
 #define INIT_OUTPUT_JACK_STRING_DESCR(jack_number, _) USBD_DESC_STRING_DEFINE(out_jack_##jack_number##_string_desc, CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME, USBD_DUT_STRING_INTERFACE)
 
-// Define in/out jack string descriptors. Named out_jack_[idx]_string_desc and in_jack_[idx]_string_desc
+// Define in/out jack string descriptors. 
+// Named out_jack_[idx]_string_desc and in_jack_[idx]_string_desc
 LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, (;));
 LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, (;));
 
@@ -74,7 +75,16 @@ static struct usb_desc_header nil_desc = {
 #define OUT_JACK_PTR(i, _) (struct usb_desc_header *)&usb_midi_config_data.out_jacks_emb[i]
 #define IN_JACK_PTR(i, _)  (struct usb_desc_header *)&usb_midi_config_data.in_jacks_emb[i]
 
-const static struct usb_desc_header *xxx[] = {
+struct usb_midi_data {
+	// fifo used to enqueue 4 byte USB MIDI packets to send at the next SOF event
+	struct ring_buf tx_fifo;
+	int has_pending_tx_buffer;
+	int is_available;
+	const struct usb_desc_header **const fs_desc;
+	const struct usb_desc_header **const hs_desc;
+};
+
+const static struct usb_desc_header *interface_descriptors[] = {
 	(struct usb_desc_header *)&usb_midi_config_data.ac_if,
 	(struct usb_desc_header *)&usb_midi_config_data.ac_cs_if,
 	(struct usb_desc_header *)&usb_midi_config_data.ms_if,
@@ -92,29 +102,17 @@ const static struct usb_desc_header *xxx[] = {
 	(struct usb_desc_header *)&usb_midi_config_data.out_cs_ep,
 	&nil_desc};
 
-struct usb_midi_data {
-	// fifo used to enqueue 4 byte USB MIDI packets to send at the next SOF event
-	struct ring_buf tx_fifo;
-	int has_pending_tx_buffer;
-	int is_available;
-	const struct usb_desc_header **const fs_desc;
-	const struct usb_desc_header **const hs_desc;
-};
-
 static uint8_t tx_fifo_data[CONFIG_USB_MIDI_TX_FIFO_SIZE];
 static struct usb_midi_data usb_midi_class_data = {
 	.tx_fifo = {.buffer = tx_fifo_data, .size = CONFIG_USB_MIDI_TX_FIFO_SIZE},
 	// .rx_buf = NULL,
 	.has_pending_tx_buffer = 0,
 	.is_available = 0,
-	.fs_desc = &xxx[0],
-	.hs_desc = &xxx[0],
+	// Use the same descriptor for full speed and high speed for now.
+	.fs_desc = &interface_descriptors[0],
+	.hs_desc = &interface_descriptors[0],
 };
 
-static int temp_tx_buffer_size = 0;
-static uint8_t temp_tx_buffer[USB_MIDI_EP_MAX_PACKET_SIZE];
-
-static int usb_midi_is_available = false;
 static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 					      .midi_message_cb = NULL,
 					      .tx_done_cb = NULL,
