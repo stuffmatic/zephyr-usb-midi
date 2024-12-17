@@ -4,7 +4,7 @@
 config USB_DEVICE_MIDI
 	bool "USB MIDI device class driver"
 	depends on (USB_DEVICE_STACK || USB_DEVICE_STACK_NEXT)
-  select RING_BUFFER
+  select RING_BUFFER if (USB_DEVICE_SOF || USB_DEVICE_STACK_NEXT)
 
 if USB_DEVICE_MIDI
 
@@ -24,11 +24,11 @@ config USB_MIDI_USE_CUSTOM_JACK_NAMES
 
 config USB_MIDI_TX_FIFO_SIZE
   int "The size in bytes of the tx fifo"
-	default 128
+	default 256
 
 config USB_MIDI_TX_FIFO_WATER_MARK
   int "Invoke callback to fill tx fifo when it has at least this much free space"
-	default 64
+	default 128
 
 #
 # Custom input jack names.

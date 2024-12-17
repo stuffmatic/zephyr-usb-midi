@@ -71,6 +71,7 @@ struct usb_midi_data {
 	// fifo used to enqueue 4 byte USB MIDI packets to send at the next SOF event
 	struct ring_buf tx_fifo;
 	int has_pending_tx_buffer;
+	int is_available;
 	const struct usb_desc_header **const fs_desc;
 	const struct usb_desc_header **const hs_desc;
 };
@@ -80,6 +81,7 @@ static struct usb_midi_data usb_midi_class_data = {
 	.tx_fifo = {.buffer = tx_fifo_data, .size = CONFIG_USB_MIDI_TX_FIFO_SIZE},
 	// .rx_buf = NULL,
 	.has_pending_tx_buffer = 0,
+	.is_available = 0,
 	.fs_desc = &xxx[0],
 	.hs_desc = &xxx[0],
 };
@@ -98,6 +100,11 @@ static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
 	struct usb_midi_data *data = &usb_midi_class_data;
+
+	if (!data->is_available) {
+		return USB_MIDI_NOT_AVAILABLE;
+	}
+
 	if (ring_buf_space_get(&data->tx_fifo) < 4) {
 		LOG_WRN("tx fifo is full");
 		return USB_MIDI_TX_FIFO_FULL;
@@ -113,26 +120,26 @@ enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	}
 	LOG_DBG_PACKET(packet);
 	
-	
 	int put_result = ring_buf_put(&data->tx_fifo, packet.bytes, 4);
 	__ASSERT(put_result == 4, "USB MIDI packet should fit in tx FIFO");
 	
 	return USB_MIDI_SUCCESS;
 }
 
-
-int tx_ep_buf_balance = 0;
+// debug counter
+int debug_tx_ep_buf_balance = 0;
 
 // return non-zero if a new buffer was enqueued, zero otherwise
 static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 {
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	if (!ring_buf_is_empty(&data->tx_fifo)) {
-		struct net_buf *buf = usbd_ep_buf_alloc(c_data, 0x81, USB_MIDI_EP_MAX_PACKET_SIZE);
-		tx_ep_buf_balance++;
+		struct net_buf *buf = usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
 		if (buf == NULL) {
-			LOG_ERR("Failed to allocate tx ep buf, balance %d", tx_ep_buf_balance);
+			LOG_ERR("Failed to allocate tx ep buf, balance %d", debug_tx_ep_buf_balance);
+			return 0;
 		}
+		debug_tx_ep_buf_balance++;
 		int num_bytes_in_fifo = ring_buf_size_get(&data->tx_fifo);
 		int num_bytes_to_add = num_bytes_in_fifo > buf->size ? buf->size : num_bytes_in_fifo;
 		int num_bytes_added = 0;
@@ -186,7 +193,6 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
 
 	// TODO: check error/status before doing this?
-	// TODO: don't hardcode endpoint addresses
 
 	if (USB_EP_DIR_IS_OUT(bi->ep)) {
 		// Received data.
@@ -224,7 +230,7 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 		usbd_ep_buf_free(uds_ctx, buf);
 
 		// ...and allocate and enqueue new one for receiving future data
-		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, 0x01, USB_MIDI_EP_MAX_PACKET_SIZE);
+		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
 		int r = usbd_ep_enqueue(c_data, next_buf);
 
 	} else {
@@ -232,7 +238,7 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 
 		// sent data to host. free the buffer...
 		usbd_ep_buf_free(uds_ctx, buf);
-		tx_ep_buf_balance--;
+		debug_tx_ep_buf_balance--;
 		// ...and enqueue next tx endpoint buffer if there is data in the tx FIFO
 		data->has_pending_tx_buffer = enqueue_next_tx_buf(c_data);
 
@@ -271,6 +277,7 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 {
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	ring_buf_reset(&data->tx_fifo);
+	data->is_available = 1;
 
 	LOG_DBG("Instance %p", c_data);
 	if (user_callbacks.available_cb) {
@@ -278,10 +285,8 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 		user_callbacks.available_cb(1);
 	}
 	
-	// TODO: don't hardcode endpoint addresses?
-	// if (data->rx_buf == NULL) {
 	// Allocate buffer for receiving data
-	struct net_buf *rx_buf = usbd_ep_buf_alloc(c_data, 0x01, USB_MIDI_EP_MAX_PACKET_SIZE);
+	struct net_buf *rx_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
 	// Enqueue the rx buffer. This signals to the stack that
 	// we're ready to receive data. If this is not done,
 	// nothing will be received.
@@ -297,6 +302,7 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 	LOG_DBG("Instance %p", c_data);
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 
+	data->is_available = 0;
 	if (user_callbacks.available_cb) {
 		LOG_INF("USB MIDI became unavailable");
 		user_callbacks.available_cb(0);
