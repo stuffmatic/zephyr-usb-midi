@@ -18,7 +18,7 @@ config USB_MIDI_NUM_OUTPUTS
 	default 1
   range 0 16
 
-config USB_MIDI_USE_CUSTOM_JACK_NAMES
+config USB_MIDI_CUSTOM_JACK_NAMES
   bool "Set to y to use custom input and output jack names defined by the options below."
 	default n
 

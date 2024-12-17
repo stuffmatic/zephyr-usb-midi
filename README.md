@@ -26,6 +26,6 @@ https://user-images.githubusercontent.com/2444852/226658203-de83b3d5-6604-40a9-8
 * `CONFIG_USB_DEVICE_MIDI`- Set to `y` to enable the USB MIDI device class driver.
 * `CONFIG_USB_MIDI_NUM_INPUTS` - The number of jacks through which MIDI data flows into the device. Between 0 and 16 (inclusive). Defaults to 1.
 * `CONFIG_USB_MIDI_NUM_OUTPUTS` - The number of jacks through which MIDI data flows out of the device. Between 0 and 16 (inclusive). Defaults to 1.
-* `CONFIG_USB_MIDI_USE_CUSTOM_JACK_NAMES` - Set to `y` to use custom input and output jack names defined by the options below.
+* `CONFIG_USB_MIDI_CUSTOM_JACK_NAMES` - Set to `y` to use custom input and output jack names defined by the options below.
 * `CONFIG_USB_MIDI_INPUT_JACK_n_NAME` - the name of input jack `n`, where `n` is the cable number of the jack.
 * `CONFIG_USB_MIDI_OUTPUT_JACK_n_NAME` - the name of output jack `n`, where `n` is the cable number of the jack.

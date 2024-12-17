@@ -22,6 +22,53 @@ static struct ring_buf tx_fifo = {
 };
 #endif
 
+#ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
+
+/* Macro for defining an out jack string descriptor */
+#define OUTPUT_JACK_STRING_DESCR(jack_number, _)                                               \
+    USBD_STRING_DESCR_USER_DEFINE(primary) struct output_jack_##jack_number##_string_descr_type                                       \
+    {                                                                                          \
+        uint8_t bLength;                                                                       \
+        uint8_t bDescriptorType;                                                               \
+        uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME)]; \
+    } __packed output_jack_##jack_number##_string_descr = { \
+		.bLength =	USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME),			\
+		.bDescriptorType = USB_DESC_STRING, \
+		.bString = CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME \
+	};
+
+/* Macro for defining an in jack string descriptor */
+#define INPUT_JACK_STRING_DESCR(jack_number, _)                                               \
+    USBD_STRING_DESCR_USER_DEFINE(primary) struct input_jack_##jack_number##_string_descr_type                                       \
+    {                                                                                         \
+        uint8_t bLength;                                                                      \
+        uint8_t bDescriptorType;                                                              \
+        uint8_t bString[USB_BSTRING_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME)]; \
+    } __packed input_jack_##jack_number##_string_descr = { \
+		.bLength =	USB_STRING_DESCRIPTOR_LENGTH(CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME),			\
+		.bDescriptorType = USB_DESC_STRING, \
+		.bString = CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME \
+	};
+
+/* Define in/out jack string descriptors */
+LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_STRING_DESCR, ())
+LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INPUT_JACK_STRING_DESCR, ())
+
+// Macros for getting pointers to in/out jack string descriptors
+#define INPUT_JACK_DESC_PTR(jack_number, _) &input_jack_##jack_number##_string_descr
+#define OUTPUT_JACK_DESC_PTR(jack_number, _) &output_jack_##jack_number##_string_descr
+
+// Define run time addressable arrays of pointers to in/out jack string descriptors
+struct usb_desc_header* input_jack_descs[] = {
+    LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INPUT_JACK_DESC_PTR, (,))
+};
+struct usb_desc_header* output_jack_descs[] = {
+    LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUTPUT_JACK_DESC_PTR, (,))
+};
+
+#endif /* CONFIG_USB_MIDI_CUSTOM_JACK_NAMES */
+
+
 USBD_CLASS_DESCR_DEFINE(primary, 0)
 struct usb_midi_config usb_midi_config_data = {
 	.ac_if = INIT_AC_IF,
@@ -134,7 +181,7 @@ static struct usb_ep_cfg_data midi_ep_cfg[] = {
 		.ep_addr = USB_MIDI_OUT_EP_ADDR,
 	}};
 
-void usb_status_callback(struct usb_cfg_data *cfg,
+static void usb_status_callback(struct usb_cfg_data *cfg,
 						 enum usb_dc_status_code cb_status,
 						 const uint8_t *param)
 {
@@ -192,6 +239,26 @@ void usb_status_callback(struct usb_cfg_data *cfg,
 	}
 }
 
+static void usb_interface_config_cb(struct usb_desc_header *head, uint8_t bInterfaceNumber) 
+{
+	#ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
+	for (int i = 0; i < CONFIG_USB_MIDI_NUM_INPUTS; i++) {
+		int descr = input_jack_descs[i];
+		int descr_idx = usb_get_str_descriptor_idx(descr);
+		usb_midi_config_data.in_jacks_emb[i].iJack = descr_idx;
+		LOG_DBG("Assigned string descriptor %d to input jack %d", descr_idx, i);
+	}
+
+	for (int i = 0; i < CONFIG_USB_MIDI_NUM_OUTPUTS; i++) {
+		int descr = output_jack_descs[i];
+		int descr_idx = usb_get_str_descriptor_idx(descr);
+		usb_midi_config_data.out_jacks_emb[i].iJack = descr_idx;
+		LOG_DBG("Assigned string descriptor %d to output jack %d", descr_idx, i);
+	}
+	
+	#endif
+}
+
 enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
 	if (!usb_midi_is_available) {
@@ -221,7 +288,7 @@ enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 
 USBD_DEFINE_CFG_DATA(usb_midi_config) = {
 	.usb_device_description = NULL,
-	.interface_config = NULL,
+	.interface_config = usb_interface_config_cb,
 	.interface_descriptor = &usb_midi_config_data.ac_if,
 	.cb_usb_status = usb_status_callback,
 	.interface = {
