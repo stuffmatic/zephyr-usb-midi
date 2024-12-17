@@ -8,7 +8,8 @@ enum usb_midi_error_t {
     /* USB MIDI device is not connected */
     USB_MIDI_NOT_AVAILABLE = 1,
     USB_MIDI_TX_FIFO_FULL = 2,
-    USB_MIDI_INVALID_DATA = 3,  
+    USB_MIDI_TX_FAILED = 3,
+    USB_MIDI_INVALID_DATA = 4  
 };
 
 /** A function to call when the USB MIDI device becomes available/unavailable. */

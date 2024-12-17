@@ -20,6 +20,8 @@ static struct ring_buf tx_fifo = {
 	.buffer = tx_fifo_data, 
 	.size = CONFIG_USB_MIDI_TX_FIFO_SIZE
 };
+static uint8_t tx_temp_buf[USB_MIDI_EP_MAX_PACKET_SIZE];
+static int has_pending_buffer = 0;
 #endif
 
 #ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
@@ -159,10 +161,30 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 	}
 }
 
+// return non-zero if a new buffer was enqueued, zero otherwise
+static int enqueue_next_tx_buf()
+{
+	if (ring_buf_is_empty(&tx_fifo)) {
+		return 0;
+	}
+	
+	// Read fifo data into the tx temp buffer. Don't read
+	// more than we can fit into the buffer.
+	int num_bytes_in_fifo = ring_buf_size_get(&tx_fifo);
+	__ASSERT_NO_MSG(num_bytes_in_fifo % 4 == 0);
+	__ASSERT_NO_MSG(buf->size % 4 == 0);
+	int num_bytes_to_add = num_bytes_in_fifo > USB_MIDI_EP_MAX_PACKET_SIZE ? USB_MIDI_EP_MAX_PACKET_SIZE : num_bytes_in_fifo;
+	int num_bytes_added = ring_buf_get(&tx_fifo, tx_temp_buf, num_bytes_to_add);
+	int write_result = usb_write(USB_MIDI_IN_EP_ADDR, tx_temp_buf, num_bytes_added, NULL);
+	
+	return 0;
+}
+
 static void midi_in_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 {
 	int invoke_tx_done = ep_status == USB_DC_EP_DATA_IN && user_callbacks.tx_done_cb;
 #ifdef CONFIG_USB_DEVICE_SOF
+	has_pending_buffer = enqueue_next_tx_buf();
 	if (ring_buf_space_get(&tx_fifo) > CONFIG_USB_MIDI_TX_FIFO_WATER_MARK)
 	{
 		invoke_tx_done = 0;
@@ -202,6 +224,7 @@ static void usb_status_callback(struct usb_cfg_data *cfg,
 	/** USB configuration done */
 	case USB_DC_CONFIGURED:
 		LOG_DBG("USB_DC_CONFIGURED");
+		has_pending_buffer = 0;
 		availability_changed(1);
 		break;
 	/** USB connection lost */
@@ -230,7 +253,10 @@ static void usb_status_callback(struct usb_cfg_data *cfg,
 		break;
 	/** Start of Frame received */
 	case USB_DC_SOF:
-		LOG_DBG("USB_DC_SOF");
+		if (!has_pending_buffer) {
+			has_pending_buffer = enqueue_next_tx_buf();
+		}
+		// LOG_DBG("USB_DC_SOF");
 		break;
 	/** Initial USB connection status */
 	case USB_DC_UNKNOWN:
@@ -282,7 +308,7 @@ enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 #else
 	int write_result = usb_write(USB_MIDI_IN_EP_ADDR, packet.bytes, 4, NULL);
 	// assume usb_write error is
-	return write_result == 0 ? USB_MIDI_SUCCESS : USB_MIDI_TX_FIFO_FULL;
+	return write_result == 0 ? USB_MIDI_SUCCESS : USB_MIDI_TX_FAILED;
 #endif
 }
 
