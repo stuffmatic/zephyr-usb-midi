@@ -158,44 +158,39 @@ int debug_tx_ep_buf_balance = 0;
 static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 {
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
-
-	if (!ring_buf_is_empty(&data->tx_fifo)) {
-		struct net_buf *buf = usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
-		if (buf == NULL) {
-			LOG_ERR("Failed to allocate tx ep buf, balance %d", debug_tx_ep_buf_balance);
-			return 0;
-		}
-		debug_tx_ep_buf_balance++;
-		int num_bytes_in_fifo = ring_buf_size_get(&data->tx_fifo);
-		
-		int num_bytes_to_add = num_bytes_in_fifo > buf->size ? buf->size : num_bytes_in_fifo;
-		int num_bytes_added = 0;
-		while (!ring_buf_is_empty(&data->tx_fifo)) {
-			// Read 4 byte USB MIDI packets from the tx fifo and put them into
-			// a tx endpoint buffer to enqueue
-			// TODO: add everything at once
-			
-			if (num_bytes_added < num_bytes_to_add) {
-				uint8_t packet_bytes[4];
-				int peek_result = ring_buf_get(&data->tx_fifo, packet_bytes, 4);
-				
-				net_buf_add_mem(buf, packet_bytes, 4);
-				num_bytes_added += 4;
-			} else {
-				// tx buffer is full. continue reading from fifo later
-				break;
-			}
-		}
-
-		int enqueue_result = usbd_ep_enqueue(c_data, buf);
-		if (enqueue_result != 0) {
-			// something else went wrong. free tx buffer. this shouldn't happen.
-			LOG_ERR("usbd_ep_enqueue failed with error %d", enqueue_result);
-			usbd_ep_buf_free(c_data->uds_ctx, buf);
-		} else {
-			return 1;
-		}
+	if (ring_buf_is_empty(&data->tx_fifo)) {
+		return 0;
 	}
+	
+	// Allocate a new endpoint buffer to enqueue
+	struct net_buf *buf = usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+	if (buf == NULL) {
+		LOG_ERR("Failed to allocate tx ep buf, balance %d", debug_tx_ep_buf_balance);
+		return 0;
+	}
+	debug_tx_ep_buf_balance++;
+
+	// Read fifo data into the endpoint buffer. Don't read
+	// more than we can fit into the buffer.
+	int num_bytes_in_fifo = ring_buf_size_get(&data->tx_fifo);
+	__ASSERT_NO_MSG(num_bytes_in_fifo % 4 == 0);
+	__ASSERT_NO_MSG(buf->size % 4 == 0);
+	int num_bytes_to_add = num_bytes_in_fifo > buf->size ? buf->size : num_bytes_in_fifo;
+	int num_bytes_read = ring_buf_get(&data->tx_fifo, buf->data, num_bytes_to_add);
+	buf->len = num_bytes_read;
+	if (num_bytes_read != num_bytes_to_add) {
+		LOG_ERR("Expected to read %d bytes from tx fifo, read %d", num_bytes_to_add, num_bytes_read);
+	}
+
+	int enqueue_result = usbd_ep_enqueue(c_data, buf);
+	if (enqueue_result != 0) {
+		// something else went wrong. free tx buffer. this shouldn't happen.
+		LOG_ERR("usbd_ep_enqueue failed with error %d", enqueue_result);
+		usbd_ep_buf_free(c_data->uds_ctx, buf);
+	} else {
+		return 1;
+	}
+	
 	return 0;
 }
 
