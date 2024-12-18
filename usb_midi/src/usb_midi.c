@@ -105,12 +105,11 @@ const static struct usb_desc_header *interface_descriptors[] = {
 static uint8_t tx_fifo_data[CONFIG_USB_MIDI_TX_FIFO_SIZE];
 static struct usb_midi_data usb_midi_class_data = {
 	.tx_fifo = {.buffer = tx_fifo_data, .size = CONFIG_USB_MIDI_TX_FIFO_SIZE},
-	// .rx_buf = NULL,
 	.has_pending_tx_buffer = 0,
 	.is_available = 0,
 	// Use the same descriptor for full speed and high speed for now.
-	.fs_desc = &interface_descriptors[0],
-	.hs_desc = &interface_descriptors[0],
+	.fs_desc = interface_descriptors,
+	.hs_desc = interface_descriptors,
 };
 
 static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
@@ -406,7 +405,7 @@ struct usbd_class_api usb_midi_class_api = {.feature_halt = usb_midi_feature_hal
 					    .shutdown = usb_midi_shutdown_cb,
 					    .get_desc = usb_midi_get_desc_cb};
 
-USBD_DEFINE_CLASS(usb_midi, &usb_midi_class_api, &usb_midi_class_data, NULL);
+USBD_DEFINE_CLASS(midi, &usb_midi_class_api, &usb_midi_class_data, NULL);
 
 void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 {

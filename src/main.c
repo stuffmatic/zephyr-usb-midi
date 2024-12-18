@@ -330,11 +330,8 @@ int main(void)
 				     &sample_fs_config);
 					 
 	printk("usbd_add_configuration result %d\n", add_config_result);
-	int register_result =  usbd_register_class(&usbd, "usb_midi", USBD_SPEED_FS, 1);
+	int register_result =  usbd_register_class(&usbd, "usb", USBD_SPEED_FS, 1);
 	printk("usbd_register_class result %d\n", register_result);
-	// register_result = usbd_register_class(&usbd, "usb_midi", USBD_SPEED_HS, 1);
-	// printk("usbd_register_class result %d\n", register_result);
-
 
 	int err = usbd_add_descriptor(&usbd, &sample_lang);
 	if (err) {
