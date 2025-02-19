@@ -2,7 +2,7 @@
 # the dir containing the sample app's CMakeLists.txt, i.e the 
 # repository root dir, which is also the root dir of the
 # driver module.
-list(APPEND ZEPHYR_EXTRA_MODULES ${CMAKE_CURRENT_SOURCE_DIR})
+list(APPEND EXTRA_ZEPHYR_MODULES ${CMAKE_CURRENT_SOURCE_DIR})
 
 cmake_minimum_required(VERSION 3.20.0)
 

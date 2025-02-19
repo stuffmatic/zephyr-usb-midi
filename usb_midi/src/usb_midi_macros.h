@@ -170,16 +170,26 @@ struct jack_string_descriptors jack_string_desc = {
         .baSourcePin = 1                \
     }
 
+#if CONFIG_USB_MIDI_NUM_INPUTS > 0
+#define INIT_INPUT_PINS_LIST LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_PIN, (, ), 1)
+#else
+#define INIT_INPUT_PINS_LIST
+#endif
+
 #define INIT_ELEMENT                                                                                                                                   \
     {                                                                                                                                                  \
-        .bLength = sizeof(struct usb_midi_element_descriptor),                                                                                         \
-        .bDescriptorType = USB_DESC_CS_INTERFACE,                                                                                                      \
-        .bDescriptorSubtype = USB_MIDI_IF_DESC_ELEMENT,                                                                                                \
-        .bElementID = ELEMENT_ID,                                                                                                                      \
-        .bNrInputPins = CONFIG_USB_MIDI_NUM_INPUTS,                                                                                                    \
-        .input_pins = {                                                                                                                                \
-            LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_PIN, (, ), 1)},                                                                             \
-        .bNrOutputPins = CONFIG_USB_MIDI_NUM_OUTPUTS, .bInTerminalLink = 0, .bOutTerminalLink = 0, .bElCapsSize = 1, .bmElementCaps = 1, .iElement = 0 \
+        .bLength = sizeof(struct usb_midi_element_descriptor),             \
+        .bDescriptorType = USB_DESC_CS_INTERFACE,                          \
+        .bDescriptorSubtype = USB_MIDI_IF_DESC_ELEMENT,                    \
+        .bElementID = ELEMENT_ID,                                          \
+        .bNrInputPins = CONFIG_USB_MIDI_NUM_INPUTS,                        \
+        .input_pins = { INIT_INPUT_PINS_LIST},                             \
+        .bNrOutputPins = CONFIG_USB_MIDI_NUM_OUTPUTS,                      \
+        .bInTerminalLink = 0,                                              \
+        .bOutTerminalLink = 0,                                             \
+        .bElCapsSize = 1,                                                  \
+        .bmElementCaps = {1},                                              \
+        .iElement = 0                                                      \
     }
 
 /* Value for the wTotalLength field of the class-specific MS Interface Descriptor,

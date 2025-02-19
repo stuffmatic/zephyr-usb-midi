@@ -20,13 +20,41 @@ struct usb_midi_config usb_midi_config_data = {
 	.ms_if = INIT_MS_IF,
 	.ms_cs_if = INIT_MS_CS_IF,
 	.out_jacks_emb = {
-		LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUT_JACK, (, ), 0)},
-	.in_jacks_emb = {LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_IN_JACK, (, ), CONFIG_USB_MIDI_NUM_OUTPUTS)},
+		#if CONFIG_USB_MIDI_NUM_OUTPUTS > 0
+			LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUT_JACK, (, ), 0)
+		#endif
+	},
+	.in_jacks_emb = {
+		#if CONFIG_USB_MIDI_NUM_INPUTS > 0
+			LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_IN_JACK, (, ), CONFIG_USB_MIDI_NUM_OUTPUTS)
+		#endif
+	},
 	.element = INIT_ELEMENT,
 	.in_ep = INIT_IN_EP,
-	.in_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_in_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_OUTPUTS, .BaAssocJackID = {LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, IDX_WITH_OFFSET, (, ), 1)}},
+	.in_cs_ep = {
+		.bLength = sizeof(struct usb_midi_bulk_in_ep_descriptor),
+		.bDescriptorType = USB_DESC_CS_ENDPOINT,
+		.bDescriptorSubtype = 0x01,
+		.bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_OUTPUTS,
+		.BaAssocJackID = {
+			#if CONFIG_USB_MIDI_NUM_OUTPUTS > 0
+				LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, IDX_WITH_OFFSET, (, ), 1)
+			#endif
+		}
+	},
 	.out_ep = INIT_OUT_EP,
-	.out_cs_ep = {.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor), .bDescriptorType = USB_DESC_CS_ENDPOINT, .bDescriptorSubtype = 0x01, .bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_INPUTS, .BaAssocJackID = {LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + CONFIG_USB_MIDI_NUM_OUTPUTS)}}};
+	.out_cs_ep = {
+		.bLength = sizeof(struct usb_midi_bulk_out_ep_descriptor),
+		.bDescriptorType = USB_DESC_CS_ENDPOINT,
+		.bDescriptorSubtype = 0x01,
+		.bNumEmbMIDIJack = CONFIG_USB_MIDI_NUM_INPUTS,
+		.BaAssocJackID = {
+			#if CONFIG_USB_MIDI_NUM_INPUTS > 0
+				LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IDX_WITH_OFFSET, (, ), 1 + CONFIG_USB_MIDI_NUM_OUTPUTS)
+			#endif
+		}
+	}
+};
 
 static int temp_tx_buffer_size = 0;
 static uint8_t temp_tx_buffer[EP_MAX_PACKET_SIZE];
@@ -74,6 +102,10 @@ static void midi_out_ep_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 		while (num_read_bytes > 0)
 		{
 			int read_rc = usb_read(ep, buf, 4, &num_read_bytes);
+			if (read_rc != 0) {
+				LOG_ERR("Failed to read from endpoint %d with error %d", ep, read_rc);
+				return;
+			}
 			if (num_read_bytes == 0)
 			{
 				break;
