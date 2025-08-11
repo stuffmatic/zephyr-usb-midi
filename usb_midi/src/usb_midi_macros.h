@@ -110,7 +110,7 @@ BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0),
 		.bNrInputPins = CONFIG_USB_MIDI_NUM_INPUTS,                                        \
 		.input_pins = {LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_PIN, (, ), 1)},      \
 		.bNrOutputPins = CONFIG_USB_MIDI_NUM_OUTPUTS, .bInTerminalLink = 0,                \
-		.bOutTerminalLink = 0, .bElCapsSize = 1, .bmElementCaps = 1, .iElement = 0         \
+		.bOutTerminalLink = 0, .bElCapsSize = 1, .bmElementCaps = { 1 }, .iElement = 0         \
 	}
 
 /* Value for the wTotalLength field of the class-specific MS Interface Descriptor,

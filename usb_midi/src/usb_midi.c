@@ -15,9 +15,6 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 		packet.bytes[1], packet.bytes[2], packet.bytes[3], packet.cable_num, packet.cin,   \
 		packet.num_midi_bytes)
 
-static struct usbd_class_data usb_midi; // TODO: remove
-
-
 #ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
 
 // Macros for defining in/out jack string descriptor nodes for given jack numbers
@@ -143,7 +140,9 @@ enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 	LOG_DBG_PACKET(packet);
 	
 	int put_result = ring_buf_put(&data->tx_fifo, packet.bytes, 4);
-	__ASSERT(put_result == 4, "USB MIDI packet should fit in tx FIFO");
+	if (put_result != 4) {
+		LOG_ERR("No room for USB MIDI packet in tx FIFO, put result %d", put_result);
+	}
 	
 	return USB_MIDI_SUCCESS;
 }
@@ -250,13 +249,19 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 
 		// ...and allocate and enqueue new one for receiving future data
 		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
-		int r = usbd_ep_enqueue(c_data, next_buf);
+		int ep_enqueue_result = usbd_ep_enqueue(c_data, next_buf);
+		if (ep_enqueue_result != 0) {
+			LOG_WRN("usbd_ep_enqueue failed with error %d", ep_enqueue_result);
+		}
 
 	} else {
 		struct usb_midi_data *data = usbd_class_get_private(c_data);
 
 		// sent data to host. free the buffer...
-		usbd_ep_buf_free(uds_ctx, buf);
+		int ep_free_result = usbd_ep_buf_free(uds_ctx, buf);
+		if (ep_free_result != 0) {
+			LOG_WRN("ep_free_result failed with error %d", ep_free_result);
+		}
 		debug_tx_ep_buf_balance--;
 		// ...and enqueue next tx endpoint buffer if there is data in the tx FIFO
 		data->has_pending_tx_buffer = enqueue_next_tx_buf(c_data);

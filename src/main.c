@@ -47,7 +47,7 @@ static struct sample_app_state_t sample_app_state = {.usb_midi_is_available = 0,
 							 };
 
 static void log_sysex_transfer_time(int is_tx, int cable_num, int num_bytes, int time_ms) {
-	float bytes_per_s = time_ms == 0 ? 0 : (float)num_bytes / (0.001 * time_ms);
+	float bytes_per_s = time_ms == 0.0f ? 0.0f : (float)num_bytes / (0.001f * time_ms);
 	LOG_INF("sysex %s done | cable %d | %d bytes in %d ms | %d bytes/s", is_tx ? "tx" : "rx", cable_num,
 		num_bytes, (int)time_ms, (int)bytes_per_s);
 }
@@ -351,7 +351,6 @@ int main(void)
 	err = usbd_add_descriptor(&usbd, &sample_sn);
 	if (err) {
 		LOG_ERR("Failed to initialize SN descriptor (%d)", err);
-		return NULL;
 	}
 
 	int init_result = usbd_init(&usbd);
