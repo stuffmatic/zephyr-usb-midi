@@ -210,9 +210,10 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 	bi = (struct udc_buf_info *)net_buf_user_data(buf);
 	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
 
-	// TODO: check error/status before doing this?
-
-	if (USB_EP_DIR_IS_OUT(bi->ep)) {
+	if (err) {
+		LOG_ERR("usb_midi_request_cb, err %d", err);
+	}
+	else if (USB_EP_DIR_IS_OUT(bi->ep)) {
 		// Received data.
 		struct usb_midi_packet_t packet;
 		struct usb_midi_parse_cb_t parse_cb = {
