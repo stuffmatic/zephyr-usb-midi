@@ -211,7 +211,8 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 	LOG_DBG("%p -> ep 0x%02x, len %u, err %d", c_data, bi->ep, buf->len, err);
 
 	if (err) {
-		LOG_ERR("usb_midi_request_cb, err %d", err);
+		int ep_free_result = usbd_ep_buf_free(uds_ctx, buf);
+		LOG_ERR("usb_midi_request_cb, err %d, buf %d, buf len %d, free result %d", err, buf, buf->len, ep_free_result);
 	}
 	else if (USB_EP_DIR_IS_OUT(bi->ep)) {
 		// Received data.
