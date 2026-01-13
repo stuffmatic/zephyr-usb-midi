@@ -30,6 +30,14 @@ config USB_MIDI_TX_FIFO_WATER_MARK
   int "Invoke callback to fill tx fifo when it has at least this much free space"
 	default 128
 
+config USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE
+  bool "When enabled, USB MIDI callbacks are invoked on the system work queue thread instead of the USB thread"
+	default y
+
+config USB_MIDI_RX_FIFO_SIZE
+  int "The size in bytes of the rx fifo. Must be a multiple of 4. Only used when USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE is enabled"
+	default 256
+
 #
 # Custom input jack names.
 #
