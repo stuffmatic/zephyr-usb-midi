@@ -18,27 +18,30 @@ LOG_MODULE_REGISTER(usb_midi, CONFIG_USB_MIDI_LOG_LEVEL);
 #ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
 
 // Macros for defining in/out jack string descriptor nodes for given jack numbers
-#define INIT_INPUT_JACK_STRING_DESCR(jack_number, _) USBD_DESC_STRING_DEFINE(in_jack_##jack_number##_string_desc, CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME, USBD_DUT_STRING_INTERFACE)
-#define INIT_OUTPUT_JACK_STRING_DESCR(jack_number, _) USBD_DESC_STRING_DEFINE(out_jack_##jack_number##_string_desc, CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME, USBD_DUT_STRING_INTERFACE)
+#define INIT_INPUT_JACK_STRING_DESCR(jack_number, _)                                               \
+	USBD_DESC_STRING_DEFINE(in_jack_##jack_number##_string_desc,                               \
+				CONFIG_USB_MIDI_INPUT_JACK_##jack_number##_NAME,                   \
+				USBD_DUT_STRING_INTERFACE)
+#define INIT_OUTPUT_JACK_STRING_DESCR(jack_number, _)                                              \
+	USBD_DESC_STRING_DEFINE(out_jack_##jack_number##_string_desc,                              \
+				CONFIG_USB_MIDI_OUTPUT_JACK_##jack_number##_NAME,                  \
+				USBD_DUT_STRING_INTERFACE)
 
-// Define in/out jack string descriptors. 
+// Define in/out jack string descriptors.
 // Named out_jack_[idx]_string_desc and in_jack_[idx]_string_desc
 LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, INIT_OUTPUT_JACK_STRING_DESCR, (;));
 LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, INIT_INPUT_JACK_STRING_DESCR, (;));
 
 // Macros for getting pointers to in/out jack string descriptors
 #define OUT_JACK_DESCR_PTR(i, _) (struct usbd_desc_node *)&out_jack_##i##_string_desc
-#define IN_JACK_DESCR_PTR(i, _) (struct usbd_desc_node *)&in_jack_##i##_string_desc
+#define IN_JACK_DESCR_PTR(i, _)	 (struct usbd_desc_node *)&in_jack_##i##_string_desc
 
 // Define run time addressable arrays of pointers to in/out jack string descriptors
-static struct usbd_desc_node* in_jack_descs[CONFIG_USB_MIDI_NUM_INPUTS] = {
-	LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IN_JACK_DESCR_PTR, (, ))
-};
-static struct usbd_desc_node* out_jack_descs[CONFIG_USB_MIDI_NUM_OUTPUTS] = {
-	LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUT_JACK_DESCR_PTR, (, ))
-};
+static struct usbd_desc_node *in_jack_descs[CONFIG_USB_MIDI_NUM_INPUTS] = {
+	LISTIFY(CONFIG_USB_MIDI_NUM_INPUTS, IN_JACK_DESCR_PTR, (, ))};
+static struct usbd_desc_node *out_jack_descs[CONFIG_USB_MIDI_NUM_OUTPUTS] = {
+	LISTIFY(CONFIG_USB_MIDI_NUM_OUTPUTS, OUT_JACK_DESCR_PTR, (, ))};
 #endif /* CONFIG_USB_MIDI_CUSTOM_JACK_NAMES */
-
 
 struct usb_midi_config usb_midi_config_data = {
 	.ac_if = INIT_AC_IF,
@@ -116,6 +119,63 @@ static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 					      .sysex_end_cb = NULL,
 					      .sysex_start_cb = NULL};
 
+static struct usb_midi_packet_t temp_rx_packet;
+static struct usb_midi_parse_cb_t rx_parse_cb = {
+	.message_cb = NULL, .sysex_data_cb = NULL, .sysex_end_cb = NULL, .sysex_start_cb = NULL};
+
+static void parse_packet(uint8_t *packet_bytes)
+{
+	int decode_result = usb_midi_packet_from_usb_bytes(packet_bytes, &temp_rx_packet);
+	if (decode_result == USB_MIDI_PACKET_SUCCESS) {
+		int parse_result = usb_midi_parse_packet(temp_rx_packet.bytes, &rx_parse_cb);
+		if (parse_result != USB_MIDI_PACKET_SUCCESS) {
+			LOG_ERR("parsing USB MIDI rx packet failed with error %d", parse_result);
+		}
+	} else {
+		LOG_WRN("decoding USB MIDI rx packet failed with error %d", decode_result);
+	}
+	LOG_DBG_PACKET(temp_rx_packet);
+}
+
+#ifdef CONFIG_USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE
+
+RING_BUF_DECLARE(rx_fifo, CONFIG_USB_MIDI_RX_FIFO_SIZE);
+static void rx_packet_parse_work_cb(struct k_work *work)
+{
+	while (!ring_buf_is_empty(&rx_fifo)) {
+		uint8_t packet_bytes[4];
+		int result = ring_buf_get(&rx_fifo, packet_bytes, 4);
+		if (result == 4) {
+			parse_packet(packet_bytes);
+		} else {
+			LOG_ERR("Expected to read 4 bytes from the rx FIFO, result %d", result);
+		}
+	}
+}
+K_WORK_DEFINE(rx_packet_parse_work, rx_packet_parse_work_cb);
+
+static void usb_midi_availability_work_cb(struct k_work *work)
+{
+	if (user_callbacks.available_cb) {
+		user_callbacks.available_cb(usb_midi_class_data.is_available);
+	}
+}
+K_WORK_DEFINE(usb_midi_availability_work, usb_midi_availability_work_cb);
+
+#endif // CONFIG_USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE
+
+static void usb_midi_availability_changed(int is_available)
+{
+	LOG_INF("USB MIDI available %d", is_available);
+#ifdef CONFIG_USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE
+	k_work_submit(&usb_midi_availability_work);
+#else
+	if (user_callbacks.available_cb) {
+		user_callbacks.available_cb(is_available);
+	}
+#endif
+}
+
 enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 {
 	struct usb_midi_data *data = &usb_midi_class_data;
@@ -138,12 +198,12 @@ enum usb_midi_error_t usb_midi_tx(uint8_t cable_number, uint8_t *midi_bytes)
 		return USB_MIDI_INVALID_DATA;
 	}
 	LOG_DBG_PACKET(packet);
-	
+
 	int put_result = ring_buf_put(&data->tx_fifo, packet.bytes, 4);
 	if (put_result != 4) {
 		LOG_ERR("No room for USB MIDI packet in tx FIFO, put result %d", put_result);
 	}
-	
+
 	return USB_MIDI_SUCCESS;
 }
 
@@ -157,9 +217,10 @@ static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 	if (ring_buf_is_empty(&data->tx_fifo)) {
 		return 0;
 	}
-	
+
 	// Allocate a new endpoint buffer to enqueue
-	struct net_buf *buf = usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+	struct net_buf *buf =
+		usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate tx ep buf, balance %d", debug_tx_ep_buf_balance);
 		return 0;
@@ -175,7 +236,8 @@ static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 	int num_bytes_read = ring_buf_get(&data->tx_fifo, buf->data, num_bytes_to_add);
 	buf->len = num_bytes_read;
 	if (num_bytes_read != num_bytes_to_add) {
-		LOG_ERR("Expected to read %d bytes from tx fifo, read %d", num_bytes_to_add, num_bytes_read);
+		LOG_ERR("Expected to read %d bytes from tx fifo, read %d", num_bytes_to_add,
+			num_bytes_read);
 	}
 
 	int enqueue_result = usbd_ep_enqueue(c_data, buf);
@@ -186,7 +248,7 @@ static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 	} else {
 		return 1;
 	}
-	
+
 	return 0;
 }
 
@@ -212,37 +274,32 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 
 	if (err) {
 		int ep_free_result = usbd_ep_buf_free(uds_ctx, buf);
-		LOG_ERR("usb_midi_request_cb, err %d, buf %d, buf len %d, free result %d", err, buf, buf->len, ep_free_result);
-	}
-	else if (USB_EP_DIR_IS_OUT(bi->ep)) {
+		LOG_ERR("usb_midi_request_cb, err %d, buf %p, buf len %d, free result %d", err, buf,
+			buf->len, ep_free_result);
+	} else if (USB_EP_DIR_IS_OUT(bi->ep)) {
 		// Received data.
-		struct usb_midi_packet_t packet;
-		struct usb_midi_parse_cb_t parse_cb = {
-			.message_cb = user_callbacks.midi_message_cb,
-			.sysex_data_cb = user_callbacks.sysex_data_cb,
-			.sysex_end_cb = user_callbacks.sysex_end_cb,
-			.sysex_start_cb = user_callbacks.sysex_start_cb
-		};
 		if (buf->len % 4 != 0) {
-			LOG_WRN("expected rx buffer length to be a multiple of 4, got %d", buf->len);
+			LOG_WRN("expected rx buffer length to be a multiple of 4, got %d",
+				buf->len);
 		}
 		int read_pos = 0;
-		// Assume the input buffer length is a multiple 
+		// Assume the input buffer length is a multiple
 		// of 4 and ignore any additional bytes.
 		while (read_pos < buf->len) {
 			int bytes_left = buf->len - read_pos;
 			if (bytes_left < 4) {
 				break;
 			}
-			int decode_result =
-				usb_midi_packet_from_usb_bytes(&buf->data[read_pos], &packet);
-			if (decode_result == USB_MIDI_PACKET_SUCCESS) {
-				usb_midi_parse_packet(packet.bytes, &parse_cb);
+#ifdef CONFIG_USB_MIDI_CALLBACKS_ON_SYSTEM_WORK_QUEUE
+			if (ring_buf_space_get(&rx_fifo) >= 4) {
+				ring_buf_put(&rx_fifo, &buf->data[read_pos], 4);
+				k_work_submit(&rx_packet_parse_work);
 			} else {
-				LOG_WRN("decoding USB MIDI rx packet failed with error %d",
-					decode_result);
+				LOG_ERR("rx fifo full");
 			}
-			LOG_DBG_PACKET(packet);
+#else
+			parse_packet(&buf->data[read_pos]);
+#endif
 			read_pos += 4;
 		}
 
@@ -250,7 +307,8 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 		usbd_ep_buf_free(uds_ctx, buf);
 
 		// ...and allocate and enqueue new one for receiving future data
-		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR,
+							     USB_MIDI_EP_MAX_PACKET_SIZE);
 		int ep_enqueue_result = usbd_ep_enqueue(c_data, next_buf);
 		if (ep_enqueue_result != 0) {
 			LOG_WRN("usbd_ep_enqueue failed with error %d", ep_enqueue_result);
@@ -269,7 +327,8 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 		data->has_pending_tx_buffer = enqueue_next_tx_buf(c_data);
 
 		// If there is enough room in the tx fifo, signal that more data may be added.
-		if (user_callbacks.tx_done_cb && ring_buf_space_get(&data->tx_fifo) <= CONFIG_USB_MIDI_TX_FIFO_WATER_MARK) {
+		if (user_callbacks.tx_done_cb &&
+		    ring_buf_space_get(&data->tx_fifo) <= CONFIG_USB_MIDI_TX_FIFO_WATER_MARK) {
 			user_callbacks.tx_done_cb();
 		}
 	}
@@ -304,15 +363,13 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	ring_buf_reset(&data->tx_fifo);
 	data->is_available = 1;
+	usb_midi_availability_changed(1);
 
 	LOG_DBG("Instance %p", c_data);
-	if (user_callbacks.available_cb) {
-		LOG_INF("USB MIDI became available");
-		user_callbacks.available_cb(1);
-	}
-	
+
 	// Allocate buffer for receiving data
-	struct net_buf *rx_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+	struct net_buf *rx_buf =
+		usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
 	// Enqueue the rx buffer. This signals to the stack that
 	// we're ready to receive data. If this is not done,
 	// nothing will be received.
@@ -329,10 +386,7 @@ void usb_midi_disable_cb(struct usbd_class_data *const c_data)
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 
 	data->is_available = 0;
-	if (user_callbacks.available_cb) {
-		LOG_INF("USB MIDI became unavailable");
-		user_callbacks.available_cb(0);
-	}
+	usb_midi_availability_changed(0);
 }
 
 /** Initialization of the class implementation */
@@ -342,25 +396,27 @@ int usb_midi_init_cb(struct usbd_class_data *const c_data)
 
 #ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
 	for (int i = 0; i < CONFIG_USB_MIDI_NUM_INPUTS; i++) {
-		struct usb_desc_header* hdr = in_jack_descs[i];
+		struct usb_desc_header *hdr = in_jack_descs[i];
 		int add_result = usbd_add_descriptor(c_data->uds_ctx, hdr);
 		if (add_result == 0) {
 			uint8_t idx = usbd_str_desc_get_idx(hdr);
 			usb_midi_config_data.in_jacks_emb[i].iJack = idx;
 			LOG_DBG("Assigned string descriptor %d to input jack %d", idx, i);
 		} else {
-			LOG_ERR("Failed to add input jack %d string descriptor with error", i, add_result);
+			LOG_ERR("Failed to add input jack %d string descriptor with error", i,
+				add_result);
 		}
 	}
 	for (int i = 0; i < CONFIG_USB_MIDI_NUM_OUTPUTS; i++) {
-		struct usb_desc_header* hdr = out_jack_descs[i];
+		struct usb_desc_header *hdr = out_jack_descs[i];
 		int add_result = usbd_add_descriptor(c_data->uds_ctx, hdr);
 		if (add_result == 0) {
 			uint8_t idx = usbd_str_desc_get_idx(hdr);
 			usb_midi_config_data.out_jacks_emb[i].iJack = idx;
 			LOG_DBG("Assigned string descriptor %d to output jack %d", idx, i);
 		} else {
-			LOG_ERR("Failed to add output jack %d string descriptor with error", i, add_result);
+			LOG_ERR("Failed to add output jack %d string descriptor with error", i,
+				add_result);
 		}
 	}
 #endif
@@ -373,13 +429,13 @@ void usb_midi_shutdown_cb(struct usbd_class_data *const c_data)
 	LOG_INF("Instance %p", c_data);
 
 #ifdef CONFIG_USB_MIDI_CUSTOM_JACK_NAMES
-for (int i = 0; i < CONFIG_USB_MIDI_NUM_INPUTS; i++) {
-		struct usbd_desc_node* desc = in_jack_descs[i];
+	for (int i = 0; i < CONFIG_USB_MIDI_NUM_INPUTS; i++) {
+		struct usbd_desc_node *desc = in_jack_descs[i];
 		usbd_remove_descriptor(desc);
 		LOG_DBG("Removed string descriptor from input jack %d", i);
 	}
 	for (int i = 0; i < CONFIG_USB_MIDI_NUM_OUTPUTS; i++) {
-		struct usb_desc_header* desc = out_jack_descs[i];
+		struct usb_desc_header *desc = out_jack_descs[i];
 		usbd_remove_descriptor(desc);
 		LOG_DBG("Removed string descriptor from output jack %d", i);
 	}
@@ -422,4 +478,9 @@ void usb_midi_register_callbacks(struct usb_midi_cb_t *cb)
 	user_callbacks.sysex_start_cb = cb->sysex_start_cb;
 	user_callbacks.sysex_data_cb = cb->sysex_data_cb;
 	user_callbacks.sysex_end_cb = cb->sysex_end_cb;
+
+	rx_parse_cb.message_cb = cb->midi_message_cb;
+	rx_parse_cb.sysex_start_cb = cb->sysex_start_cb;
+	rx_parse_cb.sysex_data_cb = cb->sysex_data_cb;
+	rx_parse_cb.sysex_end_cb = cb->sysex_end_cb;
 }
