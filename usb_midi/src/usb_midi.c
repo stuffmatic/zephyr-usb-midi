@@ -80,8 +80,8 @@ struct usb_midi_data {
 	struct ring_buf tx_fifo;
 	int has_pending_tx_buffer;
 	int is_available;
-	const struct usb_desc_header **const fs_desc;
-	const struct usb_desc_header **const hs_desc;
+	struct usb_midi_config* config;
+	const struct usb_desc_header **const desc;
 };
 
 const static struct usb_desc_header *interface_descriptors[] = {
@@ -107,10 +107,37 @@ static struct usb_midi_data usb_midi_class_data = {
 	.tx_fifo = {.buffer = tx_fifo_data, .size = CONFIG_USB_MIDI_TX_FIFO_SIZE},
 	.has_pending_tx_buffer = 0,
 	.is_available = 0,
-	// Use the same descriptor for full speed and high speed for now.
-	.fs_desc = interface_descriptors,
-	.hs_desc = interface_descriptors,
+	.config = &usb_midi_config_data,
+	.desc = interface_descriptors
 };
+
+static uint8_t usb_midi_bulk_in_ep_addr(struct usbd_class_data *const c_data)
+{
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
+	
+#if USBD_SUPPORTS_HIGH_SPEED
+	/* TODO: support high speed?
+	if (usbd_bus_speed(usbd_class_get_ctx(c_data)) == USBD_SPEED_HS) {
+		return data->config->in_ep.bEndpointAddress;
+	} */
+#endif
+
+	return data->config->in_ep.bEndpointAddress;
+}
+
+static uint8_t usb_midi_bulk_out_ep_addr(struct usbd_class_data *const c_data)
+{
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
+
+#if USBD_SUPPORTS_HIGH_SPEED
+	/* TODO: support high speed?
+	if (usbd_bus_speed(usbd_class_get_ctx(c_data)) == USBD_SPEED_HS) {
+		return data->config->out_ep.bEndpointAddress;
+	} */
+#endif
+
+	return data->config->out_ep.bEndpointAddress;
+}
 
 static struct usb_midi_cb_t user_callbacks = {.available_cb = NULL,
 					      .midi_message_cb = NULL,
@@ -220,7 +247,7 @@ static int enqueue_next_tx_buf(struct usbd_class_data *const c_data)
 
 	// Allocate a new endpoint buffer to enqueue
 	struct net_buf *buf =
-		usbd_ep_buf_alloc(c_data, USB_MIDI_IN_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+		usbd_ep_buf_alloc(c_data, usb_midi_bulk_in_ep_addr(c_data), USB_MIDI_EP_MAX_PACKET_SIZE);
 	if (buf == NULL) {
 		LOG_ERR("Failed to allocate tx ep buf, balance %d", debug_tx_ep_buf_balance);
 		return 0;
@@ -267,6 +294,7 @@ void usb_midi_update_cb(struct usbd_class_data *const c_data, uint8_t iface, uin
 /** Endpoint request completion event handler */
 int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *buf, int err)
 {
+	struct usb_midi_data *data = usbd_class_get_private(c_data);
 	struct usbd_context *uds_ctx = usbd_class_get_ctx(c_data);
 	struct udc_buf_info *bi = NULL;
 	bi = (struct udc_buf_info *)net_buf_user_data(buf);
@@ -307,7 +335,7 @@ int usb_midi_request_cb(struct usbd_class_data *const c_data, struct net_buf *bu
 		usbd_ep_buf_free(uds_ctx, buf);
 
 		// ...and allocate and enqueue new one for receiving future data
-		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR,
+		struct net_buf *next_buf = usbd_ep_buf_alloc(c_data, usb_midi_bulk_out_ep_addr(c_data),
 							     USB_MIDI_EP_MAX_PACKET_SIZE);
 		int ep_enqueue_result = usbd_ep_enqueue(c_data, next_buf);
 		if (ep_enqueue_result != 0) {
@@ -369,7 +397,7 @@ void usb_midi_enable_cb(struct usbd_class_data *const c_data)
 
 	// Allocate buffer for receiving data
 	struct net_buf *rx_buf =
-		usbd_ep_buf_alloc(c_data, USB_MIDI_OUT_EP_ADDR, USB_MIDI_EP_MAX_PACKET_SIZE);
+		usbd_ep_buf_alloc(c_data, usb_midi_bulk_out_ep_addr(c_data), USB_MIDI_EP_MAX_PACKET_SIZE);
 	// Enqueue the rx buffer. This signals to the stack that
 	// we're ready to receive data. If this is not done,
 	// nothing will be received.
@@ -449,11 +477,12 @@ void *usb_midi_get_desc_cb(struct usbd_class_data *const c_data, const enum usbd
 
 	struct usb_midi_data *data = usbd_class_get_private(c_data);
 
-	if (speed == USBD_SPEED_HS) {
-		return data->hs_desc;
+	if (speed == USBD_SPEED_HS || speed == USBD_SPEED_SS) {
+		// only full speed supported for now
+		return NULL;
 	}
 
-	return data->fs_desc;
+	return data->desc;
 }
 
 struct usbd_class_api usb_midi_class_api = {.feature_halt = usb_midi_feature_halt_cb,
