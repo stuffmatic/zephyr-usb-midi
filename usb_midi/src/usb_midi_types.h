@@ -2,6 +2,7 @@
 #define ZEPHYR_USB_MIDI_TYPES_H_
 
 #include <zephyr/init.h>
+#include <zephyr/usb/usbd.h>
 
 /** 
  * MS (MIDI streaming) Class-Specific Interface Descriptor Subtypes. 
@@ -193,8 +194,8 @@ struct usb_midi_element_descriptor {
 	uint8_t iElement;
 } __packed;
 
-/** 
- * A complete set of descriptors for a USB MIDI device without physical jacks. 
+/**
+ * A complete set of descriptors for a USB MIDI device without physical jacks.
  */
 struct usb_midi_config {
 	struct usb_if_descriptor ac_if;
@@ -208,6 +209,10 @@ struct usb_midi_config {
 	struct usb_midi_bulk_out_ep_descriptor out_cs_ep;
 	struct usb_ep_descriptor_padded in_ep;
 	struct usb_midi_bulk_in_ep_descriptor in_cs_ep;
+#if USBD_SUPPORTS_HIGH_SPEED
+	struct usb_ep_descriptor_padded hs_out_ep;
+	struct usb_ep_descriptor_padded hs_in_ep;
+#endif
 } __packed;
 
 #endif

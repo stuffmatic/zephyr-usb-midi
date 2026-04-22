@@ -10,7 +10,8 @@ BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0),
 
 #define USB_MIDI_IN_EP_ADDR	    0x81
 #define USB_MIDI_OUT_EP_ADDR	    0x01
-#define USB_MIDI_EP_MAX_PACKET_SIZE sys_cpu_to_le16(0x0040)
+#define USB_MIDI_EP_MAX_PACKET_SIZE    sys_cpu_to_le16(0x0040)
+#define USB_MIDI_EP_MAX_PACKET_SIZE_HS sys_cpu_to_le16(0x0200)
 
 /* Audio control interface descriptor */
 #define INIT_AC_IF                                                                                 \
@@ -92,6 +93,24 @@ BUILD_ASSERT((CONFIG_USB_MIDI_NUM_INPUTS + CONFIG_USB_MIDI_NUM_OUTPUTS > 0),
 		.bLength = sizeof(struct usb_ep_descriptor_padded),                                \
 		.bDescriptorType = USB_DESC_ENDPOINT, .bEndpointAddress = USB_MIDI_IN_EP_ADDR,     \
 		.bmAttributes = 0x02, .wMaxPacketSize = USB_MIDI_EP_MAX_PACKET_SIZE,               \
+		.bInterval = 0x00, .bRefresh = 0x00, .bSynchAddress = 0x00,                        \
+	}
+
+/* High-speed out endpoint */
+#define INIT_OUT_EP_HS                                                                             \
+	{                                                                                          \
+		.bLength = sizeof(struct usb_ep_descriptor_padded),                                \
+		.bDescriptorType = USB_DESC_ENDPOINT, .bEndpointAddress = USB_MIDI_OUT_EP_ADDR,    \
+		.bmAttributes = 0x02, .wMaxPacketSize = USB_MIDI_EP_MAX_PACKET_SIZE_HS,            \
+		.bInterval = 0x00, .bRefresh = 0x00, .bSynchAddress = 0x00,                        \
+	}
+
+/* High-speed in endpoint */
+#define INIT_IN_EP_HS                                                                              \
+	{                                                                                          \
+		.bLength = sizeof(struct usb_ep_descriptor_padded),                                \
+		.bDescriptorType = USB_DESC_ENDPOINT, .bEndpointAddress = USB_MIDI_IN_EP_ADDR,     \
+		.bmAttributes = 0x02, .wMaxPacketSize = USB_MIDI_EP_MAX_PACKET_SIZE_HS,            \
 		.bInterval = 0x00, .bRefresh = 0x00, .bSynchAddress = 0x00,                        \
 	}
 
